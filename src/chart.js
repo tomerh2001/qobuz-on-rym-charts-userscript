@@ -223,14 +223,20 @@ function showAllItems(doc = document) {
 }
 
 function mutationTouchesChart(mutation) {
-  const nodes = [...mutation.addedNodes, ...mutation.removedNodes];
   const ElementImpl = mutation.target?.ownerDocument?.defaultView?.Element;
+  const target = mutation.target;
+  if (ElementImpl && target instanceof ElementImpl && target.closest(CHART_CONTAINER_SELECTOR)) {
+    return true;
+  }
+
+  const nodes = [...mutation.addedNodes, ...mutation.removedNodes];
   return nodes.some(node => {
     if (!ElementImpl || !(node instanceof ElementImpl)) {
       return false;
     }
 
     return Boolean(
+      node.closest(CHART_CONTAINER_SELECTOR) ||
       node.matches(CHART_CONTAINER_SELECTOR) ||
       node.matches(CHART_ITEM_SELECTOR) ||
       node.querySelector(CHART_CONTAINER_SELECTOR) ||

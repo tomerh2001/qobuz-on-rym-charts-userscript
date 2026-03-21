@@ -200,3 +200,37 @@ test('initQobuzChartFilter applies immediately on supported chart fixtures and t
     delete globalThis.MutationObserver;
   }
 });
+
+test('initQobuzChartFilter refreshes when a qobuz link is added inside an existing chart item', async () => {
+  const dom = await loadFixture();
+  globalThis.window = dom.window;
+  globalThis.document = dom.window.document;
+  globalThis.MutationObserver = dom.window.MutationObserver;
+
+  try {
+    const observer = initQobuzChartFilter({
+      doc: dom.window.document,
+      locationObject: dom.window.location,
+    });
+
+    await waitFor(
+      () => !dom.window.document.querySelector('[data-qobuz-chart-filter-status]').textContent.includes('scanning'),
+    );
+
+    const hiddenItem = dom.window.document.getElementById('spotify-only-entry');
+    assert.equal(hiddenItem.style.display, 'none');
+
+    const lateQobuzLink = dom.window.document.createElement('a');
+    lateQobuzLink.href = 'https://open.qobuz.com/album/late-added-link';
+    lateQobuzLink.textContent = 'Late Qobuz';
+    hiddenItem.querySelector('.page_charts_section_charts_item_info').append(lateQobuzLink);
+
+    await waitFor(() => hiddenItem.style.display === '');
+
+    observer.disconnect();
+  } finally {
+    delete globalThis.window;
+    delete globalThis.document;
+    delete globalThis.MutationObserver;
+  }
+});
