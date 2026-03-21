@@ -115,16 +115,17 @@ test('readToggleState and writeToggleState persist the filter preference', async
   assert.equal(readToggleState(dom.window), true);
 });
 
-test('scanChartItemsForQobuz can trigger lazy-loaded qobuz links by scanning the chart', async () => {
+test('scanChartItemsForQobuz can trigger lazy-loaded qobuz links even when the initial scroll range is tiny', async () => {
   const dom = await loadFixture();
   const doc = dom.window.document;
   const lazyItem = doc.getElementById('spotify-only-entry');
+  const lastItem = doc.getElementById('no-links-entry');
   const mediaLinks = lazyItem.querySelector('.page_charts_section_charts_item_info');
   const lazyQobuzLink = doc.createElement('a');
   lazyQobuzLink.href = 'https://open.qobuz.com/album/lazy-loaded-link';
   lazyQobuzLink.textContent = 'Lazy Qobuz';
 
-  let scrollHeight = 2600;
+  let scrollHeight = 900;
   Object.defineProperty(doc.documentElement, 'scrollHeight', {
     configurable: true,
     get() {
@@ -136,10 +137,10 @@ test('scanChartItemsForQobuz can trigger lazy-loaded qobuz links by scanning the
     value: 900,
   });
 
-  const scrollTargets = [];
-  dom.window.scrollTo = (_x, y) => {
-    scrollTargets.push(y);
-    if (y >= 1700 && !mediaLinks.querySelector('a[href*="qobuz.com"]')) {
+  let scrollIntoViewCalls = 0;
+  lastItem.scrollIntoView = () => {
+    scrollIntoViewCalls += 1;
+    if (scrollIntoViewCalls === 1 && !mediaLinks.querySelector('a[href*="qobuz.com"]')) {
       mediaLinks.append(lazyQobuzLink);
       scrollHeight = 4200;
     }
@@ -155,8 +156,7 @@ test('scanChartItemsForQobuz can trigger lazy-loaded qobuz links by scanning the
   assert.equal(itemHasQobuzLink(lazyItem), true);
   assert.equal(summary.matches, 3);
   assert.equal(summary.total, 4);
-  assert.ok(scrollTargets.includes(1700));
-  assert.ok(scrollTargets.includes(3300));
+  assert.ok(scrollIntoViewCalls >= 1);
 });
 
 test('initQobuzChartFilter applies immediately on supported chart fixtures and toggles on click', async () => {

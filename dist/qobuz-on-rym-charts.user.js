@@ -73,14 +73,39 @@
   }
   function safeScrollTo(view, x, y) {
     if (typeof view?.scrollTo !== "function") {
-      return;
+      return false;
     }
     if (/\bnotImplemented\b/.test(String(view.scrollTo))) {
-      return;
+      return false;
     }
     try {
       view.scrollTo(x, y);
+      return true;
     } catch {
+      return false;
+    }
+  }
+  function safeScrollItemIntoView(item) {
+    if (typeof item?.scrollIntoView !== "function") {
+      return false;
+    }
+    if (/\bnotImplemented\b/.test(String(item.scrollIntoView))) {
+      return false;
+    }
+    try {
+      item.scrollIntoView({
+        block: "end",
+        inline: "nearest",
+        behavior: "auto"
+      });
+      return true;
+    } catch {
+      try {
+        item.scrollIntoView();
+        return true;
+      } catch {
+        return false;
+      }
     }
   }
   function addStyles(doc = document) {
@@ -194,6 +219,43 @@
     status.hidden = summary.total === 0;
     return status;
   }
+  function getChartItemScanKey(item, index = 0) {
+    if (!item) {
+      return `missing-${index}`;
+    }
+    const href = item.querySelector("a[href]")?.getAttribute("href");
+    if (href) {
+      return href;
+    }
+    const itemId = item.id ? `#${item.id}` : "";
+    const label = normalizeWhitespace(
+      item.querySelector(".page_charts_section_charts_item_title, .page_charts_section_charts_item_link")?.textContent ?? item.textContent ?? ""
+    );
+    return `${itemId}|${label || `item-${index}`}`;
+  }
+  function buildScanSnapshot(items, summary) {
+    const lastIndex = items.length - 1;
+    return `${summary.total}|${summary.matches}|${getChartItemScanKey(items[lastIndex], lastIndex)}`;
+  }
+  function pickNextScanTarget(items, visitedTargetKeys) {
+    for (let index2 = items.length - 1; index2 >= 0; index2 -= 1) {
+      const key = getChartItemScanKey(items[index2], index2);
+      if (!visitedTargetKeys.has(key)) {
+        return {
+          item: items[index2],
+          key
+        };
+      }
+    }
+    if (!items.length) {
+      return null;
+    }
+    const index = items.length - 1;
+    return {
+      item: items[index],
+      key: getChartItemScanKey(items[index], index)
+    };
+  }
   async function scanChartItemsForQobuz({
     doc = document,
     view = window,
@@ -205,9 +267,8 @@
     const startX = view.scrollX ?? 0;
     const startY = view.scrollY ?? 0;
     let stableSteps = 0;
-    let lastTotal = -1;
-    let lastMatches = -1;
-    let lastMaxScrollTop = -1;
+    let previousSnapshot = "";
+    const visitedTargetKeys = /* @__PURE__ */ new Set();
     showAllItems(doc);
     try {
       for (let step = 0; step < maxSteps; step += 1) {
@@ -219,24 +280,35 @@
           ...summarizeItems(items),
           scanning: true
         };
-        const maxScrollTop = Math.max(0, (scrollingElement.scrollHeight || 0) - (view.innerHeight || 0));
-        if (summary.total === lastTotal && summary.matches === lastMatches && maxScrollTop === lastMaxScrollTop) {
-          stableSteps += 1;
-        } else {
-          stableSteps = 0;
-        }
-        if (stableSteps >= SCAN_STABLE_STEPS) {
+        const target = pickNextScanTarget(items, visitedTargetKeys);
+        if (!target) {
           return {
             ...summary,
             scanning: false
           };
         }
-        lastTotal = summary.total;
-        lastMatches = summary.matches;
-        lastMaxScrollTop = maxScrollTop;
-        safeScrollTo(view, startX, maxScrollTop);
+        visitedTargetKeys.add(target.key);
+        const maxScrollTop = Math.max(0, (scrollingElement.scrollHeight || 0) - (view.innerHeight || 0));
+        if (!safeScrollItemIntoView(target.item)) {
+          safeScrollTo(view, startX, maxScrollTop);
+        }
         await wait(settleMs);
         showAllItems(doc);
+        const nextItems = getChartItems(doc);
+        const nextSummary = summarizeItems(nextItems);
+        const nextSnapshot = buildScanSnapshot(nextItems, nextSummary);
+        if (nextSnapshot === previousSnapshot) {
+          stableSteps += 1;
+        } else {
+          stableSteps = 0;
+        }
+        previousSnapshot = nextSnapshot;
+        if (stableSteps >= SCAN_STABLE_STEPS) {
+          return {
+            ...nextSummary,
+            scanning: false
+          };
+        }
       }
     } finally {
       safeScrollTo(view, startX, startY);
