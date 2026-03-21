@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>RYM Chart Fixture</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 32px;
+        font-family: system-ui, sans-serif;
+        background: #f4f6fa;
+        color: #101318;
+      }
+
+      #page_charts_section_charts {
+        display: grid;
+        gap: 16px;
+      }
+
+      .page_charts_section_charts_item {
+        padding: 18px;
+        border-radius: 18px;
+        background: #fff;
+        box-shadow: 0 10px 24px rgba(16, 19, 24, 0.08);
+      }
+
+      .page_charts_section_charts_item_title {
+        font-size: 1.1rem;
+        font-weight: 700;
+      }
+
+      .page_charts_section_charts_item_credited_text {
+        margin-top: 6px;
+        color: #445;
+      }
+
+      .page_charts_section_charts_item_info {
+        margin-top: 12px;
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <main id="page_charts_section_charts">
+      <article id="qobuz-entry" class="page_charts_section_charts_item object_release">
+        <div class="page_charts_section_charts_item_title">Album With Qobuz</div>
+        <div class="page_charts_section_charts_item_credited_text">
+          <a class="artist" href="/artist/example-artist/">Example Artist</a>
+        </div>
+        <div class="page_charts_section_charts_item_info">
+          <a href="https://open.spotify.com/album/spotify-1">Spotify</a>
+          <a href="https://www.qobuz.com/us-en/album/example/1234567890">Qobuz</a>
+        </div>
+      </article>
+
+      <article id="spotify-only-entry" class="page_charts_section_charts_item object_release">
+        <div class="page_charts_section_charts_item_title">Album Without Qobuz</div>
+        <div class="page_charts_section_charts_item_credited_text">
+          <a class="artist" href="/artist/example-artist-2/">Example Artist 2</a>
+        </div>
+        <div class="page_charts_section_charts_item_info">
+          <a href="https://open.spotify.com/album/spotify-2">Spotify</a>
+          <a href="https://music.apple.com/us/album/example/1">Apple Music</a>
+        </div>
+      </article>
+
+      <article id="open-qobuz-entry" class="page_charts_section_charts_item object_release">
+        <div class="page_charts_section_charts_item_title">Album With Open Qobuz</div>
+        <div class="page_charts_section_charts_item_credited_text">
+          <a class="artist" href="/artist/example-artist-3/">Example Artist 3</a>
+        </div>
+        <div class="page_charts_section_charts_item_info">
+          <a href="https://open.qobuz.com/album/abcdef123456">Open Qobuz</a>
+        </div>
+      </article>
+
+      <article id="no-links-entry" class="page_charts_section_charts_item object_release">
+        <div class="page_charts_section_charts_item_title">Album Without Media Links</div>
+        <div class="page_charts_section_charts_item_credited_text">
+          <a class="artist" href="/artist/example-artist-4/">Example Artist 4</a>
+        </div>
+        <div class="page_charts_section_charts_item_info">
+          <span>No media links for this entry</span>
+        </div>
+      </article>
+    </main>
+    <script src="/dist/qobuz-on-rym-charts.user.js"></script>
+  </body>
+</html>
