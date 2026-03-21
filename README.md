@@ -13,9 +13,9 @@ The script is intentionally narrow:
 ## Install
 
 1. Install [Violentmonkey](https://violentmonkey.github.io/).
-2. Open the latest release asset URL:
+2. Click the install button:
 
-   `https://github.com/tomerh2001/qobuz-on-rym-charts-userscript/releases/latest/download/qobuz-on-rym-charts.user.js`
+   [![Install in Violentmonkey](https://img.shields.io/badge/Install%20in-Violentmonkey-F7DF1E?style=for-the-badge&logo=github&logoColor=black)](https://github.com/tomerh2001/qobuz-on-rym-charts-userscript/releases/latest/download/qobuz-on-rym-charts.user.js)
 
 3. Confirm the install prompt in Violentmonkey.
 4. Open any RYM chart page and the script will hide non-Qobuz entries
