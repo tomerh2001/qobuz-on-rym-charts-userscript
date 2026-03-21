@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Qobuz on RYM Charts
 // @namespace    https://github.com/tomerh2001/qobuz-on-rym-charts-userscript
-// @version      1.0.2
+// @version      1.0.3
 // @description  Hide Rate Your Music chart results that do not include a Qobuz link.
 // @author       Tomer Horowitz
 // @match        https://rateyourmusic.com/charts/*
