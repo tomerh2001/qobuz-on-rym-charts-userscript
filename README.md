@@ -24,7 +24,10 @@ The script is intentionally narrow:
 ## Behavior
 
 - Entries with a Qobuz link stay visible.
-- Entries without a Qobuz link are hidden from the page.
+- When the filter is on, the script briefly auto-scrolls through the chart to
+  trigger lazy-loaded results and media links, so manual scrolling is not
+  required before the counts settle.
+- Entries without a Qobuz link are then hidden from the page.
 - A floating button in the bottom-left corner shows the current mode and counts.
 - Click the button to toggle the Qobuz-only filter on or off.
 - The on/off preference is saved in local browser storage for later page loads.

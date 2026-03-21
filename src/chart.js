@@ -6,6 +6,11 @@ const FILTERED_ATTR = 'data-qobuz-chart-filtered';
 const STATUS_ATTR = 'data-qobuz-chart-filter-status';
 const STYLE_ID = 'qobuz-on-rym-charts-style';
 const TOGGLE_STORAGE_KEY = 'qobuz-on-rym-charts-enabled';
+const SCAN_STEP_RATIO = 0.85;
+const SCAN_MIN_STEP_PX = 480;
+const SCAN_SETTLE_MS = 150;
+const SCAN_MAX_STEPS = 30;
+const SCAN_STABLE_STEPS = 2;
 
 function normalizeWhitespace(value) {
   return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim() : '';
@@ -42,6 +47,10 @@ export function itemHasQobuzLink(item) {
 }
 
 export function formatStatusText(summary, enabled) {
+  if (summary.scanning) {
+    return `Qobuz only: scanning... (${summary.matches} matches in ${summary.total})`;
+  }
+
   if (enabled) {
     return `Qobuz only: ON (${summary.shown} shown, ${summary.hidden} hidden)`;
   }
@@ -59,6 +68,26 @@ function summarizeItems(items) {
     shown,
     hidden: total - shown,
   };
+}
+
+function wait(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function safeScrollTo(view, x, y) {
+  if (typeof view?.scrollTo !== 'function') {
+    return;
+  }
+
+  if (/\bnotImplemented\b/.test(String(view.scrollTo))) {
+    return;
+  }
+
+  try {
+    view.scrollTo(x, y);
+  } catch {
+    // Some environments (like JSDOM) expose scrollTo but do not implement it.
+  }
 }
 
 function addStyles(doc = document) {
@@ -161,6 +190,107 @@ export function applyQobuzFilter(doc = document, enabled = true) {
   return summary;
 }
 
+function showAllItems(doc = document) {
+  for (const item of getChartItems(doc)) {
+    showItem(item);
+  }
+}
+
+function mutationTouchesChart(mutation) {
+  const nodes = [...mutation.addedNodes, ...mutation.removedNodes];
+  const ElementImpl = mutation.target?.ownerDocument?.defaultView?.Element;
+  return nodes.some(node => {
+    if (!ElementImpl || !(node instanceof ElementImpl)) {
+      return false;
+    }
+
+    return Boolean(
+      node.matches(CHART_CONTAINER_SELECTOR) ||
+      node.matches(CHART_ITEM_SELECTOR) ||
+      node.querySelector(CHART_CONTAINER_SELECTOR) ||
+      node.querySelector(CHART_ITEM_SELECTOR),
+    );
+  });
+}
+
+function updateStatus(doc, summary, enabled) {
+  const status = ensureStatusElement(doc);
+  status.dataset.enabled = String(enabled);
+  status.textContent = formatStatusText(summary, enabled);
+  status.hidden = summary.total === 0;
+  return status;
+}
+
+export async function scanChartItemsForQobuz({
+  doc = document,
+  view = window,
+  shouldCancel = () => false,
+  settleMs = SCAN_SETTLE_MS,
+  maxSteps = SCAN_MAX_STEPS,
+} = {}) {
+  const scrollingElement = doc.scrollingElement ?? doc.documentElement ?? doc.body;
+  const startX = view.scrollX ?? 0;
+  const startY = view.scrollY ?? 0;
+  const stepSize = Math.max(SCAN_MIN_STEP_PX, Math.round((view.innerHeight || 0) * SCAN_STEP_RATIO));
+
+  let targetY = 0;
+  let stableSteps = 0;
+  let lastTotal = -1;
+  let lastMatches = -1;
+  let lastMaxScrollTop = -1;
+
+  showAllItems(doc);
+
+  try {
+    for (let step = 0; step < maxSteps; step += 1) {
+      if (shouldCancel()) {
+        break;
+      }
+
+      const items = getChartItems(doc);
+      const summary = {
+        ...summarizeItems(items),
+        scanning: true,
+      };
+
+      const maxScrollTop = Math.max(0, (scrollingElement.scrollHeight || 0) - (view.innerHeight || 0));
+      if (
+        summary.total === lastTotal &&
+        summary.matches === lastMatches &&
+        maxScrollTop === lastMaxScrollTop &&
+        targetY >= maxScrollTop
+      ) {
+        stableSteps += 1;
+      } else {
+        stableSteps = 0;
+      }
+
+      if (stableSteps >= SCAN_STABLE_STEPS) {
+        return {
+          ...summary,
+          scanning: false,
+        };
+      }
+
+      lastTotal = summary.total;
+      lastMatches = summary.matches;
+      lastMaxScrollTop = maxScrollTop;
+
+      targetY = Math.min(maxScrollTop, targetY + stepSize);
+      safeScrollTo(view, startX, targetY);
+      await wait(settleMs);
+      showAllItems(doc);
+    }
+  } finally {
+    safeScrollTo(view, startX, startY);
+  }
+
+  return {
+    ...summarizeItems(getChartItems(doc)),
+    scanning: false,
+  };
+}
+
 export function initQobuzChartFilter({
   doc = document,
   locationObject = window.location,
@@ -173,17 +303,51 @@ export function initQobuzChartFilter({
   const view = doc.defaultView ?? window;
   const MutationObserverImpl = view.MutationObserver ?? MutationObserver;
   let enabled = readToggleState(view);
+  let runId = 0;
+  let scanPromise = null;
+  let pendingRefresh = false;
 
-  let frameId = 0;
-  const scheduleApply = () => {
-    if (frameId) {
+  const refresh = () => {
+    if (scanPromise) {
+      pendingRefresh = true;
       return;
     }
 
-    frameId = view.requestAnimationFrame(() => {
-      frameId = 0;
+    const activeRun = ++runId;
+    const currentPromise = (async () => {
+      if (!enabled) {
+        applyQobuzFilter(doc, false);
+        return;
+      }
+
+      const initialSummary = {
+        ...summarizeItems(getChartItems(doc)),
+        scanning: true,
+      };
+      updateStatus(doc, initialSummary, true);
+
+      await scanChartItemsForQobuz({
+        doc,
+        view,
+        shouldCancel: () => activeRun !== runId || !enabled,
+      });
+
+      if (activeRun !== runId) {
+        return;
+      }
+
       applyQobuzFilter(doc, enabled);
+    })().finally(() => {
+      if (scanPromise === currentPromise) {
+        scanPromise = null;
+      }
+
+      if (pendingRefresh) {
+        pendingRefresh = false;
+        refresh();
+      }
     });
+    scanPromise = currentPromise;
   };
 
   const status = ensureStatusElement(doc);
@@ -192,19 +356,24 @@ export function initQobuzChartFilter({
     status.addEventListener('click', () => {
       enabled = !enabled;
       writeToggleState(enabled, view);
-      applyQobuzFilter(doc, enabled);
+      runId += 1;
+      showAllItems(doc);
+      if (!enabled) {
+        applyQobuzFilter(doc, false);
+      }
+      refresh();
     });
   }
 
   const observer = new MutationObserverImpl(mutations => {
-    const shouldRefresh = mutations.some(mutation => mutation.type === 'childList');
+    const shouldRefresh = mutations.some(mutation => mutation.type === 'childList' && mutationTouchesChart(mutation));
     if (shouldRefresh) {
-      scheduleApply();
+      refresh();
     }
   });
 
   observer.observe(doc.body, { childList: true, subtree: true });
-  view.addEventListener('popstate', scheduleApply);
-  scheduleApply();
+  view.addEventListener('popstate', refresh);
+  refresh();
   return observer;
 }
