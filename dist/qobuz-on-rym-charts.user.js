@@ -21,8 +21,6 @@
   var STATUS_ATTR = "data-qobuz-chart-filter-status";
   var STYLE_ID = "qobuz-on-rym-charts-style";
   var TOGGLE_STORAGE_KEY = "qobuz-on-rym-charts-enabled";
-  var SCAN_STEP_RATIO = 0.85;
-  var SCAN_MIN_STEP_PX = 480;
   var SCAN_SETTLE_MS = 150;
   var SCAN_MAX_STEPS = 30;
   var SCAN_STABLE_STEPS = 2;
@@ -206,8 +204,6 @@
     const scrollingElement = doc.scrollingElement ?? doc.documentElement ?? doc.body;
     const startX = view.scrollX ?? 0;
     const startY = view.scrollY ?? 0;
-    const stepSize = Math.max(SCAN_MIN_STEP_PX, Math.round((view.innerHeight || 0) * SCAN_STEP_RATIO));
-    let targetY = 0;
     let stableSteps = 0;
     let lastTotal = -1;
     let lastMatches = -1;
@@ -224,7 +220,7 @@
           scanning: true
         };
         const maxScrollTop = Math.max(0, (scrollingElement.scrollHeight || 0) - (view.innerHeight || 0));
-        if (summary.total === lastTotal && summary.matches === lastMatches && maxScrollTop === lastMaxScrollTop && targetY >= maxScrollTop) {
+        if (summary.total === lastTotal && summary.matches === lastMatches && maxScrollTop === lastMaxScrollTop) {
           stableSteps += 1;
         } else {
           stableSteps = 0;
@@ -238,8 +234,7 @@
         lastTotal = summary.total;
         lastMatches = summary.matches;
         lastMaxScrollTop = maxScrollTop;
-        targetY = Math.min(maxScrollTop, targetY + stepSize);
-        safeScrollTo(view, startX, targetY);
+        safeScrollTo(view, startX, maxScrollTop);
         await wait(settleMs);
         showAllItems(doc);
       }

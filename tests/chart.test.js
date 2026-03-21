@@ -124,18 +124,24 @@ test('scanChartItemsForQobuz can trigger lazy-loaded qobuz links by scanning the
   lazyQobuzLink.href = 'https://open.qobuz.com/album/lazy-loaded-link';
   lazyQobuzLink.textContent = 'Lazy Qobuz';
 
+  let scrollHeight = 2600;
   Object.defineProperty(doc.documentElement, 'scrollHeight', {
     configurable: true,
-    value: 2600,
+    get() {
+      return scrollHeight;
+    },
   });
   Object.defineProperty(dom.window, 'innerHeight', {
     configurable: true,
     value: 900,
   });
 
+  const scrollTargets = [];
   dom.window.scrollTo = (_x, y) => {
-    if (y >= 1200 && !mediaLinks.querySelector('a[href*="qobuz.com"]')) {
+    scrollTargets.push(y);
+    if (y >= 1700 && !mediaLinks.querySelector('a[href*="qobuz.com"]')) {
       mediaLinks.append(lazyQobuzLink);
+      scrollHeight = 4200;
     }
   };
 
@@ -149,6 +155,8 @@ test('scanChartItemsForQobuz can trigger lazy-loaded qobuz links by scanning the
   assert.equal(itemHasQobuzLink(lazyItem), true);
   assert.equal(summary.matches, 3);
   assert.equal(summary.total, 4);
+  assert.ok(scrollTargets.includes(1700));
+  assert.ok(scrollTargets.includes(3300));
 });
 
 test('initQobuzChartFilter applies immediately on supported chart fixtures and toggles on click', async () => {
