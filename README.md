@@ -25,8 +25,9 @@ The script is intentionally narrow:
 
 - Entries with a Qobuz link stay visible.
 - Entries without a Qobuz link are hidden from the page.
-- A small status chip in the bottom-left corner shows how many chart entries
-  are currently shown and hidden.
+- A floating button in the bottom-left corner shows the current mode and counts.
+- Click the button to toggle the Qobuz-only filter on or off.
+- The on/off preference is saved in local browser storage for later page loads.
 
 ## Development
 
