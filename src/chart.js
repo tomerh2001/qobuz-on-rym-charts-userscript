@@ -6,6 +6,8 @@ const FILTERED_ATTR = 'data-qobuz-chart-filtered';
 const STATUS_ATTR = 'data-qobuz-chart-filter-status';
 const STYLE_ID = 'qobuz-on-rym-charts-style';
 const TOGGLE_STORAGE_KEY = 'qobuz-on-rym-charts-enabled';
+const SCAN_STEP_RATIO = 0.85;
+const SCAN_MIN_STEP_PX = 480;
 const SCAN_SETTLE_MS = 150;
 const SCAN_MAX_STEPS = 30;
 const SCAN_STABLE_STEPS = 2;
@@ -74,45 +76,17 @@ function wait(ms) {
 
 function safeScrollTo(view, x, y) {
   if (typeof view?.scrollTo !== 'function') {
-    return false;
+    return;
   }
 
   if (/\bnotImplemented\b/.test(String(view.scrollTo))) {
-    return false;
+    return;
   }
 
   try {
     view.scrollTo(x, y);
-    return true;
   } catch {
     // Some environments (like JSDOM) expose scrollTo but do not implement it.
-    return false;
-  }
-}
-
-function safeScrollItemIntoView(item) {
-  if (typeof item?.scrollIntoView !== 'function') {
-    return false;
-  }
-
-  if (/\bnotImplemented\b/.test(String(item.scrollIntoView))) {
-    return false;
-  }
-
-  try {
-    item.scrollIntoView({
-      block: 'end',
-      inline: 'nearest',
-      behavior: 'auto',
-    });
-    return true;
-  } catch {
-    try {
-      item.scrollIntoView();
-      return true;
-    } catch {
-      return false;
-    }
   }
 }
 
@@ -253,53 +227,6 @@ function updateStatus(doc, summary, enabled) {
   return status;
 }
 
-function getChartItemScanKey(item, index = 0) {
-  if (!item) {
-    return `missing-${index}`;
-  }
-
-  const href = item.querySelector('a[href]')?.getAttribute('href');
-  if (href) {
-    return href;
-  }
-
-  const itemId = item.id ? `#${item.id}` : '';
-  const label = normalizeWhitespace(
-    item.querySelector('.page_charts_section_charts_item_title, .page_charts_section_charts_item_link')?.textContent ??
-      item.textContent ??
-      '',
-  );
-
-  return `${itemId}|${label || `item-${index}`}`;
-}
-
-function buildScanSnapshot(items, summary) {
-  const lastIndex = items.length - 1;
-  return `${summary.total}|${summary.matches}|${getChartItemScanKey(items[lastIndex], lastIndex)}`;
-}
-
-function pickNextScanTarget(items, visitedTargetKeys) {
-  for (let index = items.length - 1; index >= 0; index -= 1) {
-    const key = getChartItemScanKey(items[index], index);
-    if (!visitedTargetKeys.has(key)) {
-      return {
-        item: items[index],
-        key,
-      };
-    }
-  }
-
-  if (!items.length) {
-    return null;
-  }
-
-  const index = items.length - 1;
-  return {
-    item: items[index],
-    key: getChartItemScanKey(items[index], index),
-  };
-}
-
 export async function scanChartItemsForQobuz({
   doc = document,
   view = window,
@@ -310,10 +237,13 @@ export async function scanChartItemsForQobuz({
   const scrollingElement = doc.scrollingElement ?? doc.documentElement ?? doc.body;
   const startX = view.scrollX ?? 0;
   const startY = view.scrollY ?? 0;
+  const stepSize = Math.max(SCAN_MIN_STEP_PX, Math.round((view.innerHeight || 0) * SCAN_STEP_RATIO));
 
+  let targetY = 0;
   let stableSteps = 0;
-  let previousSnapshot = '';
-  const visitedTargetKeys = new Set();
+  let lastTotal = -1;
+  let lastMatches = -1;
+  let lastMaxScrollTop = -1;
 
   showAllItems(doc);
 
@@ -329,42 +259,33 @@ export async function scanChartItemsForQobuz({
         scanning: true,
       };
 
-      const target = pickNextScanTarget(items, visitedTargetKeys);
-      if (!target) {
+      const maxScrollTop = Math.max(0, (scrollingElement.scrollHeight || 0) - (view.innerHeight || 0));
+      if (
+        summary.total === lastTotal &&
+        summary.matches === lastMatches &&
+        maxScrollTop === lastMaxScrollTop &&
+        targetY >= maxScrollTop
+      ) {
+        stableSteps += 1;
+      } else {
+        stableSteps = 0;
+      }
+
+      if (stableSteps >= SCAN_STABLE_STEPS) {
         return {
           ...summary,
           scanning: false,
         };
       }
 
-      visitedTargetKeys.add(target.key);
+      lastTotal = summary.total;
+      lastMatches = summary.matches;
+      lastMaxScrollTop = maxScrollTop;
 
-      const maxScrollTop = Math.max(0, (scrollingElement.scrollHeight || 0) - (view.innerHeight || 0));
-      if (!safeScrollItemIntoView(target.item)) {
-        safeScrollTo(view, startX, maxScrollTop);
-      }
-
+      targetY = Math.min(maxScrollTop, targetY + stepSize);
+      safeScrollTo(view, startX, targetY);
       await wait(settleMs);
       showAllItems(doc);
-
-      const nextItems = getChartItems(doc);
-      const nextSummary = summarizeItems(nextItems);
-      const nextSnapshot = buildScanSnapshot(nextItems, nextSummary);
-
-      if (nextSnapshot === previousSnapshot) {
-        stableSteps += 1;
-      } else {
-        stableSteps = 0;
-      }
-
-      previousSnapshot = nextSnapshot;
-
-      if (stableSteps >= SCAN_STABLE_STEPS) {
-        return {
-          ...nextSummary,
-          scanning: false,
-        };
-      }
     }
   } finally {
     safeScrollTo(view, startX, startY);
