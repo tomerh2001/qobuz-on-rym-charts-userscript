@@ -1,0 +1,27 @@
+/** @type {import('semantic-release').GlobalConfig} */
+export default {
+  branches: ['main'],
+  plugins: [
+    ['@semantic-release/commit-analyzer', { preset: 'conventionalcommits' }],
+    ['@semantic-release/release-notes-generator', { preset: 'conventionalcommits' }],
+    ['@semantic-release/npm', { npmPublish: false }],
+    [
+      '@semantic-release/github',
+      {
+        assets: [
+          {
+            path: 'dist/qobuz-on-rym-charts.user.js',
+            label: 'Violentmonkey userscript',
+          },
+        ],
+      },
+    ],
+    [
+      '@semantic-release/git',
+      {
+        assets: ['package.json', 'package-lock.json', 'dist/qobuz-on-rym-charts.user.js'],
+        message: 'chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}',
+      },
+    ],
+  ],
+};

@@ -22,8 +22,8 @@ const userscriptHeader = `// ==UserScript==
 // @run-at       document-idle
 // @homepageURL  https://github.com/tomerh2001/qobuz-on-rym-charts-userscript
 // @supportURL   https://github.com/tomerh2001/qobuz-on-rym-charts-userscript/issues
-// @downloadURL  https://raw.githubusercontent.com/tomerh2001/qobuz-on-rym-charts-userscript/main/dist/qobuz-on-rym-charts.user.js
-// @updateURL    https://raw.githubusercontent.com/tomerh2001/qobuz-on-rym-charts-userscript/main/dist/qobuz-on-rym-charts.user.js
+// @downloadURL  https://github.com/tomerh2001/qobuz-on-rym-charts-userscript/releases/latest/download/qobuz-on-rym-charts.user.js
+// @updateURL    https://github.com/tomerh2001/qobuz-on-rym-charts-userscript/releases/latest/download/qobuz-on-rym-charts.user.js
 // ==/UserScript==`;
 
 await build({
@@ -38,4 +38,3 @@ await build({
     js: userscriptHeader,
   },
 });
-

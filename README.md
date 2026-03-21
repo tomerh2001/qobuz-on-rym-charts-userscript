@@ -13,9 +13,9 @@ The script is intentionally narrow:
 ## Install
 
 1. Install [Violentmonkey](https://violentmonkey.github.io/).
-2. Open the raw userscript URL:
+2. Open the latest release asset URL:
 
-   `https://raw.githubusercontent.com/tomerh2001/qobuz-on-rym-charts-userscript/main/dist/qobuz-on-rym-charts.user.js`
+   `https://github.com/tomerh2001/qobuz-on-rym-charts-userscript/releases/latest/download/qobuz-on-rym-charts.user.js`
 
 3. Confirm the install prompt in Violentmonkey.
 4. Open any RYM chart page and the script will hide non-Qobuz entries
@@ -55,3 +55,21 @@ Then open:
 The fixture includes a mix of Qobuz and non-Qobuz chart entries so you can
 verify the filter behavior locally.
 
+## Releases
+
+This repo follows the same release contract as
+`redacted-on-rym-userscript`:
+
+- `fix:` bumps the patch version
+- `feat:` bumps the minor version
+- `BREAKING CHANGE:` or `!` bumps the major version
+
+On every push to `main`, GitHub Actions runs the CI checks first and then runs
+`semantic-release`. The release job updates `package.json`, rebuilds
+`dist/qobuz-on-rym-charts.user.js` through the `postversion` hook, creates the
+Git tag and GitHub release, and commits the versioned files back to `main`
+automatically.
+
+The install and update URLs intentionally point at the latest GitHub release
+asset instead of `raw.githubusercontent.com/main/...`, so installs track the
+published release artifact rather than the moving branch tip.

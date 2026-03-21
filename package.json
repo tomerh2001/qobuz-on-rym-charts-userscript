@@ -15,6 +15,7 @@
   "scripts": {
     "build": "node scripts/build-userscript.mjs",
     "fixture:serve": "node scripts/serve-fixture.mjs",
+    "postversion": "npm run build",
     "test": "node --test",
     "ci": "npm test && npm run build"
   },
