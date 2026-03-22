@@ -307,6 +307,43 @@ test('initChartProviderFilter replaces legacy single-button controls with the ne
   }
 });
 
+test('initChartProviderFilter stops provider-button clicks from leaking to other delegated page handlers', async () => {
+  const dom = await loadFixture();
+  const doc = dom.window.document;
+  let leakedClicks = 0;
+
+  doc.body.addEventListener('click', () => {
+    leakedClicks += 1;
+  });
+
+  globalThis.window = dom.window;
+  globalThis.document = doc;
+  globalThis.MutationObserver = dom.window.MutationObserver;
+
+  try {
+    const observer = initChartProviderFilter({
+      doc,
+      locationObject: dom.window.location,
+    });
+
+    await waitFor(
+      () => !doc.querySelector('[data-qobuz-chart-filter-status]').textContent.includes('Scanning'),
+    );
+
+    getProviderButton(doc, 'tidal').click();
+
+    assert.equal(doc.getElementById('qobuz-entry').style.display, 'none');
+    assert.equal(doc.getElementById('tidal-entry').style.display, '');
+    assert.equal(leakedClicks, 0);
+
+    observer.disconnect();
+  } finally {
+    delete globalThis.window;
+    delete globalThis.document;
+    delete globalThis.MutationObserver;
+  }
+});
+
 test('initChartProviderFilter does not rescan after switching providers once the page was already scanned', async () => {
   const dom = await loadFixture();
   const doc = dom.window.document;

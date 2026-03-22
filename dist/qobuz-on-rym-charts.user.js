@@ -27,6 +27,7 @@
   var SCAN_SETTLE_MS = 150;
   var SCAN_MAX_STEPS = 30;
   var SCAN_STABLE_STEPS = 2;
+  var CONTROL_EVENT_TYPES = ["pointerdown", "mousedown", "mouseup", "click", "dblclick", "touchstart", "touchend"];
   var FILTER_MODES = {
     off: "off",
     qobuz: "qobuz",
@@ -216,6 +217,20 @@
       status,
       buttons: [...buttonRow.querySelectorAll(`[${BUTTON_ATTR}]`)]
     };
+  }
+  function isolateControlEvents(controls) {
+    if (controls.dataset.eventIsolationBound === "true") {
+      return;
+    }
+    controls.dataset.eventIsolationBound = "true";
+    for (const eventType of CONTROL_EVENT_TYPES) {
+      controls.addEventListener(eventType, (event) => {
+        if (eventType !== "click") {
+          event.preventDefault();
+        }
+        event.stopPropagation();
+      });
+    }
   }
   function hideItem(item) {
     item.dataset.qobuzChartVisible = "false";
@@ -417,13 +432,16 @@
       });
       scanPromise = currentPromise;
     };
-    const { buttons } = ensureControls(doc);
+    const { controls, buttons } = ensureControls(doc);
+    isolateControlEvents(controls);
     for (const button of buttons) {
       if (button.dataset.boundClick) {
         continue;
       }
       button.dataset.boundClick = "true";
-      button.addEventListener("click", () => {
+      button.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
         const nextMode = button.dataset.mode ?? FILTER_MODES.qobuz;
         mode = mode === nextMode ? FILTER_MODES.off : normalizeFilterMode(nextMode);
         writeFilterMode(mode, view);
