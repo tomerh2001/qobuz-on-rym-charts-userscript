@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Qobuz + Tidal on RYM Charts
 // @namespace    https://github.com/tomerh2001/qobuz-on-rym-charts-userscript
-// @version      1.2.0
+// @version      1.2.1
 // @description  Hide Rate Your Music chart results that do not include a Qobuz or Tidal link.
 // @author       Tomer Horowitz
 // @match        https://rateyourmusic.com/charts/*
