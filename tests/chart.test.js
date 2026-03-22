@@ -251,6 +251,57 @@ test('initChartProviderFilter applies qobuz mode by default and switches to tida
   }
 });
 
+test('initChartProviderFilter installs only one active instance per page', async () => {
+  const dom = await loadFixture();
+  const doc = dom.window.document;
+  const originalAddEventListener = dom.window.addEventListener.bind(dom.window);
+  let popstateListenerCount = 0;
+
+  dom.window.addEventListener = (type, listener, options) => {
+    if (type === 'popstate') {
+      popstateListenerCount += 1;
+    }
+
+    return originalAddEventListener(type, listener, options);
+  };
+
+  globalThis.window = dom.window;
+  globalThis.document = doc;
+  globalThis.MutationObserver = dom.window.MutationObserver;
+
+  try {
+    const firstObserver = initChartProviderFilter({
+      doc,
+      locationObject: dom.window.location,
+    });
+    const secondObserver = initChartProviderFilter({
+      doc,
+      locationObject: dom.window.location,
+    });
+
+    assert.equal(firstObserver, secondObserver);
+    assert.equal(popstateListenerCount, 1);
+
+    await waitFor(() => !getStatusElement(doc).textContent.includes('Scanning'));
+
+    firstObserver.disconnect();
+
+    const thirdObserver = initChartProviderFilter({
+      doc,
+      locationObject: dom.window.location,
+    });
+
+    assert.notEqual(thirdObserver, firstObserver);
+    assert.equal(popstateListenerCount, 2);
+
+    thirdObserver.disconnect();
+  } finally {
+    delete globalThis.window;
+    delete globalThis.document;
+    delete globalThis.MutationObserver;
+  }
+});
+
 test('initChartProviderFilter replaces legacy single-button controls with the new two-button panel', async () => {
   const dom = await loadFixture();
   const doc = dom.window.document;

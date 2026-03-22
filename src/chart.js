@@ -8,6 +8,7 @@ const STATUS_ATTR = 'data-qobuz-chart-filter-status';
 const BUTTON_ATTR = 'data-qobuz-chart-filter-button';
 const STYLE_ID = 'qobuz-on-rym-charts-style';
 const FILTER_MODE_STORAGE_KEY = 'qobuz-on-rym-charts-mode';
+const INSTANCE_KEY = '__qobuzOnRymChartsInstance__';
 const SCAN_STEP_RATIO = 0.85;
 const SCAN_MIN_STEP_PX = 480;
 const SCAN_SETTLE_MS = 150;
@@ -457,9 +458,14 @@ export function initChartProviderFilter({
     return null;
   }
 
+  const view = doc.defaultView ?? window;
+  const existingInstance = view[INSTANCE_KEY];
+  if (existingInstance?.ownerDocument === doc) {
+    return existingInstance.observer;
+  }
+
   addStyles(doc);
   removeLegacyStatusElements(doc);
-  const view = doc.defaultView ?? window;
   const MutationObserverImpl = view.MutationObserver ?? MutationObserver;
   let pagePath = locationObject?.pathname ?? view.location?.pathname ?? '';
   let mode = readFilterMode(view);
@@ -578,11 +584,26 @@ export function initChartProviderFilter({
   });
 
   observer.observe(doc.body, { childList: true, subtree: true });
-  view.addEventListener('popstate', () => {
+  const handlePopstate = () => {
     chartDirty = true;
     hasScannedPage = false;
     refresh('popstate');
-  });
+  };
+  view.addEventListener('popstate', handlePopstate);
+
+  const nativeDisconnect = observer.disconnect.bind(observer);
+  observer.disconnect = () => {
+    nativeDisconnect();
+    view.removeEventListener('popstate', handlePopstate);
+    if (view[INSTANCE_KEY]?.observer === observer) {
+      delete view[INSTANCE_KEY];
+    }
+  };
+
+  view[INSTANCE_KEY] = {
+    observer,
+    ownerDocument: doc,
+  };
   refresh('initial');
   return observer;
 }

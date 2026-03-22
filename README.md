@@ -62,6 +62,10 @@ The built userscript is written to `dist/qobuz-on-rym-charts.user.js`.
 - The current build should show two buttons: `Qobuz` and `Tidal`.
 - Clicking `Show RED / OPS` from `redacted-on-rym-userscript` should not start a
   new Qobuz/Tidal scan on a page that was already settled.
+- If Violentmonkey shows both `Qobuz on RYM Charts` and `Qobuz + Tidal on RYM Charts`,
+  remove the duplicate install and keep only one copy. Releases from `v1.1.0`
+  through `v1.2.4` briefly used the renamed title and could be installed beside
+  the older script instead of replacing it.
 - In Violentmonkey, remove the older installed script if needed and reinstall
   from the latest release asset.
 

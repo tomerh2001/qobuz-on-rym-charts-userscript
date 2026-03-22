@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         Qobuz + Tidal on RYM Charts
+// @name         Qobuz on RYM Charts
 // @namespace    https://github.com/tomerh2001/qobuz-on-rym-charts-userscript
 // @version      1.2.4
 // @description  Hide Rate Your Music chart results that do not include a Qobuz or Tidal link.
@@ -22,6 +22,7 @@
   var BUTTON_ATTR = "data-qobuz-chart-filter-button";
   var STYLE_ID = "qobuz-on-rym-charts-style";
   var FILTER_MODE_STORAGE_KEY = "qobuz-on-rym-charts-mode";
+  var INSTANCE_KEY = "__qobuzOnRymChartsInstance__";
   var SCAN_STEP_RATIO = 0.85;
   var SCAN_MIN_STEP_PX = 480;
   var SCAN_SETTLE_MS = 150;
@@ -391,9 +392,13 @@
     if (!isSupportedChartPath(locationObject?.pathname ?? "")) {
       return null;
     }
+    const view = doc.defaultView ?? window;
+    const existingInstance = view[INSTANCE_KEY];
+    if (existingInstance?.ownerDocument === doc) {
+      return existingInstance.observer;
+    }
     addStyles(doc);
     removeLegacyStatusElements(doc);
-    const view = doc.defaultView ?? window;
     const MutationObserverImpl = view.MutationObserver ?? MutationObserver;
     let pagePath = locationObject?.pathname ?? view.location?.pathname ?? "";
     let mode = readFilterMode(view);
@@ -493,11 +498,24 @@
       }
     });
     observer.observe(doc.body, { childList: true, subtree: true });
-    view.addEventListener("popstate", () => {
+    const handlePopstate = () => {
       chartDirty = true;
       hasScannedPage = false;
       refresh("popstate");
-    });
+    };
+    view.addEventListener("popstate", handlePopstate);
+    const nativeDisconnect = observer.disconnect.bind(observer);
+    observer.disconnect = () => {
+      nativeDisconnect();
+      view.removeEventListener("popstate", handlePopstate);
+      if (view[INSTANCE_KEY]?.observer === observer) {
+        delete view[INSTANCE_KEY];
+      }
+    };
+    view[INSTANCE_KEY] = {
+      observer,
+      ownerDocument: doc
+    };
     refresh("initial");
     return observer;
   }
