@@ -51,12 +51,14 @@ The built userscript is written to `dist/qobuz-on-rym-charts.user.js`.
 
 ## Troubleshooting
 
-- If you still see the old single-button `Qobuz only` UI, you are still running
-  an older userscript build.
+- If you still see the old single-button `Qobuz only` UI after updating, reload
+  the chart page once.
+- `v1.2.1` also removes the legacy single-button control if it is still present
+  in the page DOM from an earlier build.
 - The current build should show two buttons: `Qobuz` and `Tidal`.
 - In Violentmonkey, remove the older installed script if needed and reinstall
   from the latest release asset.
-- The current release version is `v1.2.0`.
+- The current release version is `v1.2.1`.
 
 ## Local Fixture
 

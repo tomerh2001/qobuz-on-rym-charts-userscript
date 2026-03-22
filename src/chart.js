@@ -140,11 +140,7 @@ function safeScrollTo(view, x, y) {
 }
 
 function addStyles(doc = document) {
-  if (doc.getElementById(STYLE_ID)) {
-    return;
-  }
-
-  const style = doc.createElement('style');
+  const style = doc.getElementById(STYLE_ID) ?? doc.createElement('style');
   style.id = STYLE_ID;
   style.textContent = `
     [${CONTROLS_ATTR}] {
@@ -200,7 +196,19 @@ function addStyles(doc = document) {
     }
   `;
 
-  doc.head.append(style);
+  if (!style.isConnected) {
+    doc.head.append(style);
+  }
+}
+
+function removeLegacyStatusElements(doc = document) {
+  for (const element of doc.querySelectorAll(`[${STATUS_ATTR}]`)) {
+    if (element.closest(`[${CONTROLS_ATTR}]`)) {
+      continue;
+    }
+
+    element.remove();
+  }
 }
 
 function ensureControls(doc = document) {
@@ -410,6 +418,7 @@ export function initChartProviderFilter({
   }
 
   addStyles(doc);
+  removeLegacyStatusElements(doc);
   const view = doc.defaultView ?? window;
   const MutationObserverImpl = view.MutationObserver ?? MutationObserver;
   let pagePath = locationObject?.pathname ?? view.location?.pathname ?? '';

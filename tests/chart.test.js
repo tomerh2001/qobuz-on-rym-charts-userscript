@@ -249,6 +249,64 @@ test('initChartProviderFilter applies qobuz mode by default and switches to tida
   }
 });
 
+test('initChartProviderFilter replaces legacy single-button controls with the new two-button panel', async () => {
+  const dom = await loadFixture();
+  const doc = dom.window.document;
+
+  const legacyStyle = doc.createElement('style');
+  legacyStyle.id = 'qobuz-on-rym-charts-style';
+  legacyStyle.textContent = `
+    [data-qobuz-chart-filter-status] {
+      position: fixed;
+      left: 16px;
+      bottom: 16px;
+      padding: 12px 16px;
+      border-radius: 999px;
+      background: rgba(14, 18, 24, 0.9);
+      color: #f5f7fa;
+    }
+  `;
+  doc.head.append(legacyStyle);
+
+  const legacyStatus = doc.createElement('button');
+  legacyStatus.type = 'button';
+  legacyStatus.setAttribute('data-qobuz-chart-filter-status', '');
+  legacyStatus.textContent = 'Qobuz only: ON (legacy)';
+  doc.body.append(legacyStatus);
+
+  globalThis.window = dom.window;
+  globalThis.document = doc;
+  globalThis.MutationObserver = dom.window.MutationObserver;
+
+  try {
+    const observer = initChartProviderFilter({
+      doc,
+      locationObject: dom.window.location,
+    });
+
+    await waitFor(
+      () => !doc.querySelector('[data-qobuz-chart-filter-status]').textContent.includes('Scanning'),
+    );
+
+    assert.ok(observer);
+    assert.equal(doc.querySelectorAll('[data-qobuz-chart-filter-controls]').length, 1);
+    assert.equal(doc.querySelectorAll('[data-qobuz-chart-filter-button]').length, 2);
+    assert.equal(
+      [...doc.querySelectorAll('[data-qobuz-chart-filter-status]')].filter(
+        element => !element.closest('[data-qobuz-chart-filter-controls]'),
+      ).length,
+      0,
+    );
+    assert.match(doc.getElementById('qobuz-on-rym-charts-style').textContent, /data-qobuz-chart-filter-controls/);
+
+    observer.disconnect();
+  } finally {
+    delete globalThis.window;
+    delete globalThis.document;
+    delete globalThis.MutationObserver;
+  }
+});
+
 test('initChartProviderFilter does not rescan after switching providers once the page was already scanned', async () => {
   const dom = await loadFixture();
   const doc = dom.window.document;
