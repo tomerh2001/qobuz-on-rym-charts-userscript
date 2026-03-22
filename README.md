@@ -33,6 +33,8 @@ The script is intentionally narrow:
   off reuses the current page state instead of rescanning immediately.
 - Entries without a link for the active provider are hidden from the page.
 - A floating control panel in the bottom-left corner shows the current counts.
+- The floating controls render inside an isolated iframe so other page scripts do
+  not hijack provider-button clicks.
 - It includes separate `Qobuz` and `Tidal` buttons, and only one provider can
   be active at a time.
 - Clicking the active provider button again turns filtering off and shows

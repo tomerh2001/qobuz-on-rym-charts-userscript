@@ -22,8 +22,20 @@ import {
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const fixturePath = path.join(rootDir, 'tests', 'fixtures', 'charts', 'top', 'album', 'all-time', 'index.html');
 
+function getControlsFrame(doc) {
+  return doc.querySelector('iframe[data-qobuz-chart-filter-controls]');
+}
+
+function getControlsDoc(doc) {
+  return getControlsFrame(doc)?.contentDocument ?? doc;
+}
+
+function getStatusElement(doc) {
+  return getControlsDoc(doc).querySelector('[data-qobuz-chart-filter-status]');
+}
+
 function getProviderButton(doc, mode) {
-  return doc.querySelector(`[data-qobuz-chart-filter-button="${mode}"]`);
+  return getControlsDoc(doc).querySelector(`[data-qobuz-chart-filter-button="${mode}"]`);
 }
 
 async function loadFixture(url = 'https://rateyourmusic.com/charts/top/album/all-time/') {
@@ -86,10 +98,7 @@ test('applyProviderFilter hides entries without qobuz links in qobuz mode', asyn
   assert.equal(doc.getElementById('tidal-entry').style.display, 'none');
   assert.equal(doc.getElementById('spotify-only-entry').style.display, 'none');
   assert.equal(doc.getElementById('no-links-entry').style.display, 'none');
-  assert.equal(
-    doc.querySelector('[data-qobuz-chart-filter-status]').textContent,
-    formatStatusText(summary, 'qobuz'),
-  );
+  assert.equal(getStatusElement(doc).textContent, formatStatusText(summary, 'qobuz'));
 });
 
 test('applyProviderFilter hides entries without tidal links in tidal mode', async () => {
@@ -110,10 +119,7 @@ test('applyProviderFilter hides entries without tidal links in tidal mode', asyn
   assert.equal(doc.getElementById('tidal-entry').style.display, '');
   assert.equal(doc.getElementById('spotify-only-entry').style.display, 'none');
   assert.equal(doc.getElementById('no-links-entry').style.display, 'none');
-  assert.equal(
-    doc.querySelector('[data-qobuz-chart-filter-status]').textContent,
-    formatStatusText(summary, 'tidal'),
-  );
+  assert.equal(getStatusElement(doc).textContent, formatStatusText(summary, 'tidal'));
 });
 
 test('applyProviderFilter leaves all chart entries visible when filtering is off', async () => {
@@ -131,10 +137,7 @@ test('applyProviderFilter leaves all chart entries visible when filtering is off
 
   assert.equal(doc.getElementById('spotify-only-entry').style.display, '');
   assert.equal(doc.getElementById('no-links-entry').style.display, '');
-  assert.equal(
-    doc.querySelector('[data-qobuz-chart-filter-status]').textContent,
-    formatStatusText(summary, 'off'),
-  );
+  assert.equal(getStatusElement(doc).textContent, formatStatusText(summary, 'off'));
 });
 
 test('readFilterMode and writeFilterMode persist the active provider mode', async () => {
@@ -214,14 +217,13 @@ test('initChartProviderFilter applies qobuz mode by default and switches to tida
       locationObject: dom.window.location,
     });
 
-    await waitFor(
-      () => !dom.window.document.querySelector('[data-qobuz-chart-filter-status]').textContent.includes('Scanning'),
-    );
+    await waitFor(() => !getStatusElement(dom.window.document).textContent.includes('Scanning'));
 
     const qobuzButton = getProviderButton(dom.window.document, 'qobuz');
     const tidalButton = getProviderButton(dom.window.document, 'tidal');
 
     assert.ok(observer);
+    assert.ok(getControlsFrame(dom.window.document));
     assert.equal(qobuzButton.getAttribute('aria-pressed'), 'true');
     assert.equal(tidalButton.getAttribute('aria-pressed'), 'false');
     assert.equal(dom.window.document.getElementById('qobuz-entry').style.display, '');
@@ -284,20 +286,13 @@ test('initChartProviderFilter replaces legacy single-button controls with the ne
       locationObject: dom.window.location,
     });
 
-    await waitFor(
-      () => !doc.querySelector('[data-qobuz-chart-filter-status]').textContent.includes('Scanning'),
-    );
+    await waitFor(() => !getStatusElement(doc).textContent.includes('Scanning'));
 
     assert.ok(observer);
-    assert.equal(doc.querySelectorAll('[data-qobuz-chart-filter-controls]').length, 1);
-    assert.equal(doc.querySelectorAll('[data-qobuz-chart-filter-button]').length, 2);
-    assert.equal(
-      [...doc.querySelectorAll('[data-qobuz-chart-filter-status]')].filter(
-        element => !element.closest('[data-qobuz-chart-filter-controls]'),
-      ).length,
-      0,
-    );
-    assert.match(doc.getElementById('qobuz-on-rym-charts-style').textContent, /data-qobuz-chart-filter-controls/);
+    assert.equal(doc.querySelectorAll('iframe[data-qobuz-chart-filter-controls]').length, 1);
+    assert.equal(getControlsDoc(doc).querySelectorAll('[data-qobuz-chart-filter-button]').length, 2);
+    assert.equal(doc.querySelectorAll('[data-qobuz-chart-filter-status]').length, 0);
+    assert.match(doc.getElementById('qobuz-on-rym-charts-style').textContent, /iframe\[data-qobuz-chart-filter-controls]/);
 
     observer.disconnect();
   } finally {
@@ -326,9 +321,7 @@ test('initChartProviderFilter stops provider-button clicks from leaking to other
       locationObject: dom.window.location,
     });
 
-    await waitFor(
-      () => !doc.querySelector('[data-qobuz-chart-filter-status]').textContent.includes('Scanning'),
-    );
+    await waitFor(() => !getStatusElement(doc).textContent.includes('Scanning'));
 
     getProviderButton(doc, 'tidal').click();
 
@@ -372,9 +365,7 @@ test('initChartProviderFilter does not rescan after switching providers once the
       locationObject: dom.window.location,
     });
 
-    await waitFor(
-      () => !doc.querySelector('[data-qobuz-chart-filter-status]').textContent.includes('Scanning'),
-    );
+    await waitFor(() => !getStatusElement(doc).textContent.includes('Scanning'));
 
     assert.ok(scrollTargets.length > 0);
 
@@ -408,9 +399,7 @@ test('initChartProviderFilter refreshes when a qobuz link is added inside an exi
       locationObject: dom.window.location,
     });
 
-    await waitFor(
-      () => !dom.window.document.querySelector('[data-qobuz-chart-filter-status]').textContent.includes('Scanning'),
-    );
+    await waitFor(() => !getStatusElement(dom.window.document).textContent.includes('Scanning'));
 
     const hiddenItem = dom.window.document.getElementById('spotify-only-entry');
     assert.equal(hiddenItem.style.display, 'none');
@@ -466,9 +455,7 @@ test('initChartProviderFilter does not queue a second full scan for observer upd
       locationObject: dom.window.location,
     });
 
-    await waitFor(
-      () => !doc.querySelector('[data-qobuz-chart-filter-status]').textContent.includes('Scanning'),
-    );
+    await waitFor(() => !getStatusElement(doc).textContent.includes('Scanning'));
 
     observer.disconnect();
     assert.equal(itemHasProviderLink(lazyItem, 'qobuz'), true);

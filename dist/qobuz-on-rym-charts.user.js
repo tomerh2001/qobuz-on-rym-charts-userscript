@@ -18,6 +18,7 @@
   var CHART_CONTAINER_SELECTOR = "#page_charts_section_charts, .page_charts_section_charts";
   var FILTERED_ATTR = "data-qobuz-chart-filtered";
   var CONTROLS_ATTR = "data-qobuz-chart-filter-controls";
+  var PANEL_ATTR = "data-qobuz-chart-filter-panel";
   var STATUS_ATTR = "data-qobuz-chart-filter-status";
   var BUTTON_ATTR = "data-qobuz-chart-filter-button";
   var STYLE_ID = "qobuz-on-rym-charts-style";
@@ -27,7 +28,7 @@
   var SCAN_SETTLE_MS = 150;
   var SCAN_MAX_STEPS = 30;
   var SCAN_STABLE_STEPS = 2;
-  var CONTROL_EVENT_TYPES = ["pointerdown", "mousedown", "mouseup", "click", "dblclick", "touchstart", "touchend"];
+  var CONTROL_FRAME_MIN_HEIGHT_PX = 112;
   var FILTER_MODES = {
     off: "off",
     qobuz: "qobuz",
@@ -47,14 +48,18 @@
     return Object.values(FILTER_MODES).includes(value) ? value : FILTER_MODES.qobuz;
   }
   function getControls(doc = document) {
-    const controls = doc.querySelector(`[${CONTROLS_ATTR}]`);
-    if (!controls) {
+    const frame = doc.querySelector(`iframe[${CONTROLS_ATTR}]`);
+    if (!frame?.contentDocument) {
       return null;
     }
+    const frameDoc = frame.contentDocument;
     return {
-      controls,
-      status: controls.querySelector(`[${STATUS_ATTR}]`),
-      buttons: [...controls.querySelectorAll(`[${BUTTON_ATTR}]`)]
+      controls: frame,
+      frame,
+      frameDoc,
+      panel: frameDoc.querySelector(`[${PANEL_ATTR}]`),
+      status: frameDoc.querySelector(`[${STATUS_ATTR}]`),
+      buttons: [...frameDoc.querySelectorAll(`[${BUTTON_ATTR}]`)]
     };
   }
   function itemMatchesMode(item, mode) {
@@ -126,25 +131,75 @@
     const style = doc.getElementById(STYLE_ID) ?? doc.createElement("style");
     style.id = STYLE_ID;
     style.textContent = `
-    [${CONTROLS_ATTR}] {
+    iframe[${CONTROLS_ATTR}] {
       position: fixed;
       left: max(16px, env(safe-area-inset-left));
       bottom: max(16px, env(safe-area-inset-bottom));
       z-index: 2147483647;
+      width: min(320px, calc(100vw - 32px));
+      height: ${CONTROL_FRAME_MIN_HEIGHT_PX}px;
+      border: 0;
+      padding: 0;
+      margin: 0;
+      overflow: hidden;
+      background: transparent;
+      color-scheme: normal;
+    }
+  `;
+    if (!style.isConnected) {
+      doc.head.append(style);
+    }
+  }
+  function removeLegacyStatusElements(doc = document) {
+    for (const element of doc.querySelectorAll(`[${STATUS_ATTR}], [${CONTROLS_ATTR}]`)) {
+      element.remove();
+    }
+  }
+  function ensureControls(doc = document) {
+    const existing = getControls(doc);
+    if (existing) {
+      return existing;
+    }
+    const frame = doc.createElement("iframe");
+    frame.setAttribute(CONTROLS_ATTR, "");
+    frame.setAttribute("title", "Qobuz and Tidal chart filters");
+    frame.setAttribute("scrolling", "no");
+    frame.setAttribute("tabindex", "-1");
+    frame.src = "about:blank";
+    doc.body.append(frame);
+    const frameDoc = frame.contentDocument;
+    if (!frameDoc) {
+      return null;
+    }
+    frameDoc.open();
+    frameDoc.write("<!doctype html><html><head></head><body></body></html>");
+    frameDoc.close();
+    const innerStyle = frameDoc.createElement("style");
+    innerStyle.textContent = `
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: transparent;
+      overflow: hidden;
+    }
+
+    body {
+      font: 600 14px/1.2 system-ui, sans-serif;
+    }
+
+    [${PANEL_ATTR}] {
       display: grid;
       gap: 10px;
-      min-width: 240px;
       padding: 12px;
       border: 1px solid rgba(255, 255, 255, 0.16);
       border-radius: 18px;
       background: rgba(14, 18, 24, 0.9);
       color: #f5f7fa;
-      font: 600 14px/1.2 system-ui, sans-serif;
       box-shadow: 0 12px 30px rgba(0, 0, 0, 0.24);
       backdrop-filter: blur(14px);
     }
 
-    [${CONTROLS_ATTR}] [data-qobuz-chart-filter-button-row] {
+    [data-qobuz-chart-filter-button-row] {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 8px;
@@ -178,29 +233,13 @@
       line-height: 1.35;
     }
   `;
-    if (!style.isConnected) {
-      doc.head.append(style);
-    }
-  }
-  function removeLegacyStatusElements(doc = document) {
-    for (const element of doc.querySelectorAll(`[${STATUS_ATTR}]`)) {
-      if (element.closest(`[${CONTROLS_ATTR}]`)) {
-        continue;
-      }
-      element.remove();
-    }
-  }
-  function ensureControls(doc = document) {
-    const existing = getControls(doc);
-    if (existing) {
-      return existing;
-    }
-    const controls = doc.createElement("section");
-    controls.setAttribute(CONTROLS_ATTR, "");
-    const buttonRow = doc.createElement("div");
+    frameDoc.head.append(innerStyle);
+    const panel = frameDoc.createElement("section");
+    panel.setAttribute(PANEL_ATTR, "");
+    const buttonRow = frameDoc.createElement("div");
     buttonRow.dataset.qobuzChartFilterButtonRow = "true";
     for (const provider of [FILTER_MODES.qobuz, FILTER_MODES.tidal]) {
-      const button = doc.createElement("button");
+      const button = frameDoc.createElement("button");
       button.type = "button";
       button.setAttribute(BUTTON_ATTR, provider);
       button.dataset.mode = provider;
@@ -208,29 +247,11 @@
       button.textContent = getProviderLabel(provider);
       buttonRow.append(button);
     }
-    const status = doc.createElement("div");
+    const status = frameDoc.createElement("div");
     status.setAttribute(STATUS_ATTR, "");
-    controls.append(buttonRow, status);
-    doc.body.append(controls);
-    return {
-      controls,
-      status,
-      buttons: [...buttonRow.querySelectorAll(`[${BUTTON_ATTR}]`)]
-    };
-  }
-  function isolateControlEvents(controls) {
-    if (controls.dataset.eventIsolationBound === "true") {
-      return;
-    }
-    controls.dataset.eventIsolationBound = "true";
-    for (const eventType of CONTROL_EVENT_TYPES) {
-      controls.addEventListener(eventType, (event) => {
-        if (eventType !== "click") {
-          event.preventDefault();
-        }
-        event.stopPropagation();
-      });
-    }
+    panel.append(buttonRow, status);
+    frameDoc.body.append(panel);
+    return getControls(doc);
   }
   function hideItem(item) {
     item.dataset.qobuzChartVisible = "false";
@@ -257,13 +278,24 @@
     }
   }
   function updateControls(doc, summary, mode) {
-    const { controls, status, buttons } = ensureControls(doc);
+    const controlParts = ensureControls(doc);
+    if (!controlParts) {
+      return null;
+    }
+    const { controls, panel, status, buttons, frameDoc } = controlParts;
     status.textContent = formatStatusText(summary, mode);
     controls.hidden = summary.total === 0;
     for (const button of buttons) {
       const isActive = button.dataset.mode === mode;
       button.setAttribute("aria-pressed", String(isActive));
     }
+    const measuredHeight = Math.max(
+      CONTROL_FRAME_MIN_HEIGHT_PX,
+      panel?.scrollHeight ?? 0,
+      frameDoc.body?.scrollHeight ?? 0,
+      frameDoc.documentElement?.scrollHeight ?? 0
+    );
+    controls.style.height = `${measuredHeight}px`;
     return controls;
   }
   function applyProviderFilter(doc = document, mode = FILTER_MODES.qobuz) {
@@ -432,8 +464,11 @@
       });
       scanPromise = currentPromise;
     };
-    const { controls, buttons } = ensureControls(doc);
-    isolateControlEvents(controls);
+    const controlParts = ensureControls(doc);
+    if (!controlParts) {
+      return null;
+    }
+    const { buttons } = controlParts;
     for (const button of buttons) {
       if (button.dataset.boundClick) {
         continue;
