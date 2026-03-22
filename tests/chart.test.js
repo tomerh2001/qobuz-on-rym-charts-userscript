@@ -12,7 +12,7 @@ import {
   getChartItems,
   initQobuzChartFilter,
   isSupportedChartPath,
-  itemHasQobuzLink,
+  itemHasSupportedLink,
   readToggleState,
   scanChartItemsForQobuz,
   writeToggleState,
@@ -50,30 +50,32 @@ test('isSupportedChartPath only enables the script on chart URLs', () => {
   assert.equal(isSupportedChartPath('/release/album/james-blake/trying-times/'), false);
 });
 
-test('itemHasQobuzLink detects Qobuz links inside chart cards', async () => {
+test('itemHasSupportedLink detects Qobuz and Tidal links inside chart cards', async () => {
   const dom = await loadFixture();
   const items = getChartItems(dom.window.document);
 
-  assert.equal(itemHasQobuzLink(items[0]), true);
-  assert.equal(itemHasQobuzLink(items[1]), false);
-  assert.equal(itemHasQobuzLink(items[2]), true);
-  assert.equal(itemHasQobuzLink(items[3]), false);
+  assert.equal(itemHasSupportedLink(items[0]), true);
+  assert.equal(itemHasSupportedLink(items[1]), false);
+  assert.equal(itemHasSupportedLink(items[2]), true);
+  assert.equal(itemHasSupportedLink(items[3]), true);
+  assert.equal(itemHasSupportedLink(items[4]), false);
 });
 
-test('applyQobuzFilter hides non-Qobuz chart entries and renders a toggle button summary', async () => {
+test('applyQobuzFilter hides entries without Qobuz or Tidal links and renders a toggle button summary', async () => {
   const dom = await loadFixture();
   const doc = dom.window.document;
   const summary = applyQobuzFilter(doc, true);
 
   assert.deepEqual(summary, {
-    total: 4,
-    matches: 2,
-    shown: 2,
+    total: 5,
+    matches: 3,
+    shown: 3,
     hidden: 2,
   });
 
   assert.equal(doc.getElementById('qobuz-entry').style.display, '');
   assert.equal(doc.getElementById('open-qobuz-entry').style.display, '');
+  assert.equal(doc.getElementById('tidal-entry').style.display, '');
   assert.equal(doc.getElementById('spotify-only-entry').style.display, 'none');
   assert.equal(doc.getElementById('no-links-entry').style.display, 'none');
 
@@ -89,9 +91,9 @@ test('applyQobuzFilter leaves all chart entries visible when filtering is off', 
   const summary = applyQobuzFilter(doc, false);
 
   assert.deepEqual(summary, {
-    total: 4,
-    matches: 2,
-    shown: 4,
+    total: 5,
+    matches: 3,
+    shown: 5,
     hidden: 0,
   });
 
@@ -148,9 +150,9 @@ test('scanChartItemsForQobuz can trigger lazy-loaded qobuz links by scanning the
     maxSteps: 8,
   });
 
-  assert.equal(itemHasQobuzLink(lazyItem), true);
-  assert.equal(summary.matches, 3);
-  assert.equal(summary.total, 4);
+  assert.equal(itemHasSupportedLink(lazyItem), true);
+  assert.equal(summary.matches, 4);
+  assert.equal(summary.total, 5);
   assert.ok(scrollTargets.includes(765));
   assert.ok(scrollTargets.includes(1530));
 });
@@ -190,6 +192,58 @@ test('initQobuzChartFilter applies immediately on supported chart fixtures and t
 
     observer.disconnect();
     assert.deepEqual(jsdomErrors, []);
+  } finally {
+    delete globalThis.window;
+    delete globalThis.document;
+    delete globalThis.MutationObserver;
+  }
+});
+
+test('initQobuzChartFilter does not rescan after toggling off and back on once the page was already scanned', async () => {
+  const dom = await loadFixture();
+  const doc = dom.window.document;
+
+  Object.defineProperty(doc.documentElement, 'scrollHeight', {
+    configurable: true,
+    value: 2600,
+  });
+  Object.defineProperty(dom.window, 'innerHeight', {
+    configurable: true,
+    value: 900,
+  });
+
+  const scrollTargets = [];
+  dom.window.scrollTo = (_x, y) => {
+    scrollTargets.push(y);
+  };
+
+  globalThis.window = dom.window;
+  globalThis.document = doc;
+  globalThis.MutationObserver = dom.window.MutationObserver;
+
+  try {
+    const observer = initQobuzChartFilter({
+      doc,
+      locationObject: dom.window.location,
+    });
+
+    await waitFor(
+      () => !doc.querySelector('[data-qobuz-chart-filter-status]').textContent.includes('scanning'),
+    );
+
+    assert.ok(scrollTargets.length > 0);
+
+    const statusButton = doc.querySelector('[data-qobuz-chart-filter-status]');
+    scrollTargets.length = 0;
+
+    statusButton.click();
+    assert.equal(doc.getElementById('spotify-only-entry').style.display, '');
+
+    statusButton.click();
+    assert.equal(doc.getElementById('spotify-only-entry').style.display, 'none');
+    assert.deepEqual(scrollTargets, []);
+
+    observer.disconnect();
   } finally {
     delete globalThis.window;
     delete globalThis.document;
@@ -272,7 +326,7 @@ test('initQobuzChartFilter does not queue a second full scan for observer update
     );
 
     observer.disconnect();
-    assert.equal(itemHasQobuzLink(lazyItem), true);
+    assert.equal(itemHasSupportedLink(lazyItem), true);
     assert.equal(lazyItem.style.display, '');
     assert.deepEqual(scrollTargets, [765, 1530, 1700, 1700, 0]);
   } finally {

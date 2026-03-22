@@ -1,13 +1,13 @@
-# Qobuz on RYM Charts
+# Qobuz + Tidal on RYM Charts
 
 Violentmonkey userscript that hides Rate Your Music chart entries that do not
-include a Qobuz link on the current chart page.
+include a Qobuz or Tidal link on the current chart page.
 
 The script is intentionally narrow:
 
 - it only runs on `rateyourmusic.com/charts/*`
 - it filters release cards, not song/artist rows
-- it keeps entries with any `qobuz.com` or `open.qobuz.com` link
+- it keeps entries with any `qobuz.com`, `open.qobuz.com`, or `tidal.com` link
 - it reapplies itself when RYM adds or redraws chart items
 
 ## Install
@@ -18,19 +18,22 @@ The script is intentionally narrow:
    [![Install in Violentmonkey](https://img.shields.io/badge/Install%20in-Violentmonkey-F7DF1E?style=for-the-badge&logo=github&logoColor=black)](https://github.com/tomerh2001/qobuz-on-rym-charts-userscript/releases/latest/download/qobuz-on-rym-charts.user.js)
 
 3. Confirm the install prompt in Violentmonkey.
-4. Open any RYM chart page and the script will hide non-Qobuz entries
+4. Open any RYM chart page and the script will hide entries without Qobuz or
+   Tidal links
    automatically.
 
 ## Behavior
 
-- Entries with a Qobuz link stay visible.
+- Entries with a Qobuz or Tidal link stay visible.
 - When the filter is on, the script repeatedly jumps to the current bottom of
   the chart to trigger lazy-loaded results and media links, then repeats until
   the page height stops growing, so manual scrolling is not required before the
   counts settle.
-- Entries without a Qobuz link are then hidden from the page.
+- Once a page has already been scanned, toggling the filter off and back on
+  reuses the current page state instead of rescanning immediately.
+- Entries without a Qobuz or Tidal link are then hidden from the page.
 - A floating button in the bottom-left corner shows the current mode and counts.
-- Click the button to toggle the Qobuz-only filter on or off.
+- Click the button to toggle the Qobuz/Tidal-only filter on or off.
 - The on/off preference is saved in local browser storage for later page loads.
 
 ## Development
@@ -57,8 +60,8 @@ Then open:
 
 `http://127.0.0.1:4173/charts/top/album/all-time/`
 
-The fixture includes a mix of Qobuz and non-Qobuz chart entries so you can
-verify the filter behavior locally.
+The fixture includes a mix of Qobuz, Tidal, and unsupported chart entries so
+you can verify the filter behavior locally.
 
 ## Releases
 

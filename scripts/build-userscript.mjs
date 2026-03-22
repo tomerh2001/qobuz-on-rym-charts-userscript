@@ -12,10 +12,10 @@ const outputDir = path.join(rootDir, 'dist');
 await mkdir(outputDir, { recursive: true });
 
 const userscriptHeader = `// ==UserScript==
-// @name         Qobuz on RYM Charts
+// @name         Qobuz + Tidal on RYM Charts
 // @namespace    https://github.com/tomerh2001/qobuz-on-rym-charts-userscript
 // @version      ${packageJson.version}
-// @description  Hide Rate Your Music chart results that do not include a Qobuz link.
+// @description  Hide Rate Your Music chart results that do not include a Qobuz or Tidal link.
 // @author       ${packageJson.author}
 // @match        https://rateyourmusic.com/charts/*
 // @grant        none

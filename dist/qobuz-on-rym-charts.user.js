@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Qobuz on RYM Charts
+// @name         Qobuz + Tidal on RYM Charts
 // @namespace    https://github.com/tomerh2001/qobuz-on-rym-charts-userscript
 // @version      1.0.7
-// @description  Hide Rate Your Music chart results that do not include a Qobuz link.
+// @description  Hide Rate Your Music chart results that do not include a Qobuz or Tidal link.
 // @author       Tomer Horowitz
 // @match        https://rateyourmusic.com/charts/*
 // @grant        none
@@ -16,7 +16,7 @@
   // src/chart.js
   var CHART_ITEM_SELECTOR = ".page_charts_section_charts_item.object_release, .page_charts_section_charts_item";
   var CHART_CONTAINER_SELECTOR = "#page_charts_section_charts, .page_charts_section_charts";
-  var QOBUZ_LINK_SELECTOR = 'a[href*="qobuz.com"]';
+  var SUPPORTED_LINK_SELECTOR = 'a[href*="qobuz.com"], a[href*="tidal.com"]';
   var FILTERED_ATTR = "data-qobuz-chart-filtered";
   var STATUS_ATTR = "data-qobuz-chart-filter-status";
   var STYLE_ID = "qobuz-on-rym-charts-style";
@@ -47,21 +47,21 @@
       );
     });
   }
-  function itemHasQobuzLink(item) {
-    return Boolean(item?.querySelector?.(QOBUZ_LINK_SELECTOR));
+  function itemHasSupportedLink(item) {
+    return Boolean(item?.querySelector?.(SUPPORTED_LINK_SELECTOR));
   }
   function formatStatusText(summary, enabled) {
     if (summary.scanning) {
-      return `Qobuz only: scanning... (${summary.matches} matches in ${summary.total})`;
+      return `Qobuz/Tidal only: scanning... (${summary.matches} matches in ${summary.total})`;
     }
     if (enabled) {
-      return `Qobuz only: ON (${summary.shown} shown, ${summary.hidden} hidden)`;
+      return `Qobuz/Tidal only: ON (${summary.shown} shown, ${summary.hidden} hidden)`;
     }
-    return `Qobuz only: OFF (${summary.matches} match${summary.matches === 1 ? "" : "es"})`;
+    return `Qobuz/Tidal only: OFF (${summary.matches} match${summary.matches === 1 ? "" : "es"})`;
   }
   function summarizeItems(items) {
     const total = items.length;
-    const matches = items.filter((item) => itemHasQobuzLink(item)).length;
+    const matches = items.filter((item) => itemHasSupportedLink(item)).length;
     const shown = items.filter((item) => item.dataset.qobuzChartVisible !== "false").length;
     return {
       total,
@@ -159,7 +159,7 @@
   function applyQobuzFilter(doc = document, enabled = true) {
     const items = getChartItems(doc);
     for (const item of items) {
-      if (!enabled || itemHasQobuzLink(item)) {
+      if (!enabled || itemHasSupportedLink(item)) {
         showItem(item);
         continue;
       }
@@ -265,11 +265,20 @@
     addStyles(doc);
     const view = doc.defaultView ?? window;
     const MutationObserverImpl = view.MutationObserver ?? MutationObserver;
+    let pagePath = locationObject?.pathname ?? view.location?.pathname ?? "";
     let enabled = readToggleState(view);
     let runId = 0;
     let scanPromise = null;
     let pendingRefresh = false;
+    let hasScannedPage = false;
+    let chartDirty = true;
     const refresh = (reason = "manual") => {
+      const currentPath = locationObject?.pathname ?? view.location?.pathname ?? "";
+      if (currentPath !== pagePath) {
+        pagePath = currentPath;
+        hasScannedPage = false;
+        chartDirty = true;
+      }
       if (scanPromise) {
         if (reason !== "observer") {
           pendingRefresh = true;
@@ -280,6 +289,10 @@
       const currentPromise = (async () => {
         if (!enabled) {
           applyQobuzFilter(doc, false);
+          return;
+        }
+        if (hasScannedPage && !chartDirty) {
+          applyQobuzFilter(doc, true);
           return;
         }
         const initialSummary = {
@@ -295,6 +308,8 @@
         if (activeRun !== runId) {
           return;
         }
+        hasScannedPage = true;
+        chartDirty = false;
         applyQobuzFilter(doc, enabled);
       })().finally(() => {
         if (scanPromise === currentPromise) {
@@ -317,6 +332,7 @@
         showAllItems(doc);
         if (!enabled) {
           applyQobuzFilter(doc, false);
+          return;
         }
         refresh("toggle");
       });
@@ -324,11 +340,16 @@
     const observer = new MutationObserverImpl((mutations) => {
       const shouldRefresh = mutations.some((mutation) => mutation.type === "childList" && mutationTouchesChart(mutation));
       if (shouldRefresh) {
+        chartDirty = true;
         refresh("observer");
       }
     });
     observer.observe(doc.body, { childList: true, subtree: true });
-    view.addEventListener("popstate", () => refresh("popstate"));
+    view.addEventListener("popstate", () => {
+      chartDirty = true;
+      hasScannedPage = false;
+      refresh("popstate");
+    });
     refresh("initial");
     return observer;
   }
