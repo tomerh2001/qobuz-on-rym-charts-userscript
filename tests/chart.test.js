@@ -230,3 +230,54 @@ test('initQobuzChartFilter refreshes when a qobuz link is added inside an existi
     delete globalThis.MutationObserver;
   }
 });
+
+test('initQobuzChartFilter does not queue a second full scan for observer updates during an active scan', async () => {
+  const dom = await loadFixture();
+  const doc = dom.window.document;
+  const lazyItem = doc.getElementById('spotify-only-entry');
+  const mediaLinks = lazyItem.querySelector('.page_charts_section_charts_item_info');
+
+  Object.defineProperty(doc.documentElement, 'scrollHeight', {
+    configurable: true,
+    value: 2600,
+  });
+  Object.defineProperty(dom.window, 'innerHeight', {
+    configurable: true,
+    value: 900,
+  });
+
+  const scrollTargets = [];
+  dom.window.scrollTo = (_x, y) => {
+    scrollTargets.push(y);
+    if (y >= 1200 && !mediaLinks.querySelector('a[href*="qobuz.com"]')) {
+      const lateQobuzLink = doc.createElement('a');
+      lateQobuzLink.href = 'https://open.qobuz.com/album/observer-during-scan';
+      lateQobuzLink.textContent = 'Observer During Scan';
+      mediaLinks.append(lateQobuzLink);
+    }
+  };
+
+  globalThis.window = dom.window;
+  globalThis.document = doc;
+  globalThis.MutationObserver = dom.window.MutationObserver;
+
+  try {
+    const observer = initQobuzChartFilter({
+      doc,
+      locationObject: dom.window.location,
+    });
+
+    await waitFor(
+      () => !doc.querySelector('[data-qobuz-chart-filter-status]').textContent.includes('scanning'),
+    );
+
+    observer.disconnect();
+    assert.equal(itemHasQobuzLink(lazyItem), true);
+    assert.equal(lazyItem.style.display, '');
+    assert.deepEqual(scrollTargets, [765, 1530, 1700, 1700, 0]);
+  } finally {
+    delete globalThis.window;
+    delete globalThis.document;
+    delete globalThis.MutationObserver;
+  }
+});

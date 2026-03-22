@@ -269,9 +269,11 @@
     let runId = 0;
     let scanPromise = null;
     let pendingRefresh = false;
-    const refresh = () => {
+    const refresh = (reason = "manual") => {
       if (scanPromise) {
-        pendingRefresh = true;
+        if (reason !== "observer") {
+          pendingRefresh = true;
+        }
         return;
       }
       const activeRun = ++runId;
@@ -300,7 +302,7 @@
         }
         if (pendingRefresh) {
           pendingRefresh = false;
-          refresh();
+          refresh("pending");
         }
       });
       scanPromise = currentPromise;
@@ -316,18 +318,18 @@
         if (!enabled) {
           applyQobuzFilter(doc, false);
         }
-        refresh();
+        refresh("toggle");
       });
     }
     const observer = new MutationObserverImpl((mutations) => {
       const shouldRefresh = mutations.some((mutation) => mutation.type === "childList" && mutationTouchesChart(mutation));
       if (shouldRefresh) {
-        refresh();
+        refresh("observer");
       }
     });
     observer.observe(doc.body, { childList: true, subtree: true });
-    view.addEventListener("popstate", refresh);
-    refresh();
+    view.addEventListener("popstate", () => refresh("popstate"));
+    refresh("initial");
     return observer;
   }
 
