@@ -29,12 +29,15 @@ The script is intentionally narrow:
   the chart to trigger lazy-loaded results and media links, then repeats until
   the page height stops growing, so manual scrolling is not required before the
   counts settle.
-- Once a page has already been scanned, toggling the filter off and back on
-  reuses the current page state instead of rescanning immediately.
-- Entries without a Qobuz or Tidal link are then hidden from the page.
-- A floating button in the bottom-left corner shows the current mode and counts.
-- Click the button to toggle the Qobuz/Tidal-only filter on or off.
-- The on/off preference is saved in local browser storage for later page loads.
+- Once a page has already been scanned, switching between Qobuz, Tidal, and
+  off reuses the current page state instead of rescanning immediately.
+- Entries without a link for the active provider are hidden from the page.
+- A floating control panel in the bottom-left corner shows the current counts.
+- It includes separate `Qobuz` and `Tidal` buttons, and only one provider can
+  be active at a time.
+- Clicking the active provider button again turns filtering off and shows
+  everything.
+- The current mode is saved in local browser storage for later page loads.
 
 ## Development
 

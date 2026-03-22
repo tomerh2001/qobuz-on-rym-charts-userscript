@@ -1,7 +1,7 @@
-import { initQobuzChartFilter } from './chart.js';
+import { initChartProviderFilter } from './chart.js';
 
 function boot() {
-  initQobuzChartFilter();
+  initChartProviderFilter();
 }
 
 if (document.readyState === 'loading') {
@@ -9,4 +9,3 @@ if (document.readyState === 'loading') {
 } else {
   boot();
 }
-

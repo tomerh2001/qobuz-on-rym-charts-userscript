@@ -1,19 +1,56 @@
 export const CHART_ITEM_SELECTOR = '.page_charts_section_charts_item.object_release, .page_charts_section_charts_item';
 
 const CHART_CONTAINER_SELECTOR = '#page_charts_section_charts, .page_charts_section_charts';
-const SUPPORTED_LINK_SELECTOR = 'a[href*="qobuz.com"], a[href*="tidal.com"]';
 const FILTERED_ATTR = 'data-qobuz-chart-filtered';
+const CONTROLS_ATTR = 'data-qobuz-chart-filter-controls';
 const STATUS_ATTR = 'data-qobuz-chart-filter-status';
+const BUTTON_ATTR = 'data-qobuz-chart-filter-button';
 const STYLE_ID = 'qobuz-on-rym-charts-style';
-const TOGGLE_STORAGE_KEY = 'qobuz-on-rym-charts-enabled';
+const FILTER_MODE_STORAGE_KEY = 'qobuz-on-rym-charts-mode';
 const SCAN_STEP_RATIO = 0.85;
 const SCAN_MIN_STEP_PX = 480;
 const SCAN_SETTLE_MS = 150;
 const SCAN_MAX_STEPS = 30;
 const SCAN_STABLE_STEPS = 2;
 
+const FILTER_MODES = {
+  off: 'off',
+  qobuz: 'qobuz',
+  tidal: 'tidal',
+};
+
+const PROVIDER_LINK_SELECTORS = {
+  qobuz: 'a[href*="qobuz.com"]',
+  tidal: 'a[href*="tidal.com"]',
+};
+
 function normalizeWhitespace(value) {
   return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim() : '';
+}
+
+function getProviderLabel(provider) {
+  return provider === FILTER_MODES.tidal ? 'Tidal' : 'Qobuz';
+}
+
+function normalizeFilterMode(value) {
+  return Object.values(FILTER_MODES).includes(value) ? value : FILTER_MODES.qobuz;
+}
+
+function getControls(doc = document) {
+  const controls = doc.querySelector(`[${CONTROLS_ATTR}]`);
+  if (!controls) {
+    return null;
+  }
+
+  return {
+    controls,
+    status: controls.querySelector(`[${STATUS_ATTR}]`),
+    buttons: [...controls.querySelectorAll(`[${BUTTON_ATTR}]`)],
+  };
+}
+
+function itemMatchesMode(item, mode) {
+  return mode === FILTER_MODES.off || itemHasProviderLink(item, mode);
 }
 
 export function isSupportedChartPath(pathname) {
@@ -42,29 +79,41 @@ export function getChartItems(root = document) {
   });
 }
 
-export function itemHasSupportedLink(item) {
-  return Boolean(item?.querySelector?.(SUPPORTED_LINK_SELECTOR));
+export function itemHasProviderLink(item, provider) {
+  const selector = PROVIDER_LINK_SELECTORS[provider];
+  if (!selector) {
+    return false;
+  }
+
+  return Boolean(item?.querySelector?.(selector));
 }
 
-export function formatStatusText(summary, enabled) {
+export function itemHasSupportedLink(item) {
+  return Object.keys(PROVIDER_LINK_SELECTORS).some(provider => itemHasProviderLink(item, provider));
+}
+
+export function formatStatusText(summary, mode) {
   if (summary.scanning) {
-    return `Qobuz/Tidal only: scanning... (${summary.matches} matches in ${summary.total})`;
+    return `Scanning chart... (${summary.qobuzMatches} Qobuz, ${summary.tidalMatches} Tidal, ${summary.total} total)`;
   }
 
-  if (enabled) {
-    return `Qobuz/Tidal only: ON (${summary.shown} shown, ${summary.hidden} hidden)`;
+  if (mode === FILTER_MODES.off) {
+    return `Filter off (${summary.qobuzMatches} Qobuz, ${summary.tidalMatches} Tidal)`;
   }
 
-  return `Qobuz/Tidal only: OFF (${summary.matches} match${summary.matches === 1 ? '' : 'es'})`;
+  return `${getProviderLabel(mode)} only: ON (${summary.shown} shown, ${summary.hidden} hidden)`;
 }
 
 function summarizeItems(items) {
   const total = items.length;
-  const matches = items.filter(item => itemHasSupportedLink(item)).length;
+  const qobuzMatches = items.filter(item => itemHasProviderLink(item, FILTER_MODES.qobuz)).length;
+  const tidalMatches = items.filter(item => itemHasProviderLink(item, FILTER_MODES.tidal)).length;
   const shown = items.filter(item => item.dataset.qobuzChartVisible !== 'false').length;
+
   return {
     total,
-    matches,
+    qobuzMatches,
+    tidalMatches,
     shown,
     hidden: total - shown,
   };
@@ -98,48 +147,94 @@ function addStyles(doc = document) {
   const style = doc.createElement('style');
   style.id = STYLE_ID;
   style.textContent = `
-    [${STATUS_ATTR}] {
+    [${CONTROLS_ATTR}] {
       position: fixed;
       left: max(16px, env(safe-area-inset-left));
       bottom: max(16px, env(safe-area-inset-bottom));
       z-index: 2147483647;
-      padding: 12px 16px;
+      display: grid;
+      gap: 10px;
+      min-width: 240px;
+      padding: 12px;
       border: 1px solid rgba(255, 255, 255, 0.16);
-      border-radius: 999px;
+      border-radius: 18px;
       background: rgba(14, 18, 24, 0.9);
       color: #f5f7fa;
       font: 600 14px/1.2 system-ui, sans-serif;
       box-shadow: 0 12px 30px rgba(0, 0, 0, 0.24);
       backdrop-filter: blur(14px);
-      cursor: pointer;
-      transition: transform 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
     }
 
-    [${STATUS_ATTR}]:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 16px 34px rgba(0, 0, 0, 0.28);
+    [${CONTROLS_ATTR}] [data-qobuz-chart-filter-button-row] {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
     }
 
-    [${STATUS_ATTR}][data-enabled="false"] {
+    [${BUTTON_ATTR}] {
+      appearance: none;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 999px;
       background: rgba(69, 77, 90, 0.92);
-      opacity: 0.92;
+      color: inherit;
+      padding: 10px 12px;
+      font: inherit;
+      cursor: pointer;
+      transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease, opacity 120ms ease;
+    }
+
+    [${BUTTON_ATTR}]:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
+    }
+
+    [${BUTTON_ATTR}][aria-pressed="true"] {
+      background: linear-gradient(135deg, rgba(80, 178, 255, 0.95), rgba(24, 119, 242, 0.95));
+      border-color: rgba(255, 255, 255, 0.28);
+    }
+
+    [${STATUS_ATTR}] {
+      color: rgba(245, 247, 250, 0.88);
+      font-size: 13px;
+      line-height: 1.35;
     }
   `;
 
   doc.head.append(style);
 }
 
-function ensureStatusElement(doc = document) {
-  const existing = doc.querySelector(`[${STATUS_ATTR}]`);
+function ensureControls(doc = document) {
+  const existing = getControls(doc);
   if (existing) {
     return existing;
   }
 
-  const status = doc.createElement('button');
-  status.type = 'button';
+  const controls = doc.createElement('section');
+  controls.setAttribute(CONTROLS_ATTR, '');
+
+  const buttonRow = doc.createElement('div');
+  buttonRow.dataset.qobuzChartFilterButtonRow = 'true';
+
+  for (const provider of [FILTER_MODES.qobuz, FILTER_MODES.tidal]) {
+    const button = doc.createElement('button');
+    button.type = 'button';
+    button.setAttribute(BUTTON_ATTR, provider);
+    button.dataset.mode = provider;
+    button.setAttribute('aria-pressed', 'false');
+    button.textContent = getProviderLabel(provider);
+    buttonRow.append(button);
+  }
+
+  const status = doc.createElement('div');
   status.setAttribute(STATUS_ATTR, '');
-  doc.body.append(status);
-  return status;
+
+  controls.append(buttonRow, status);
+  doc.body.append(controls);
+  return {
+    controls,
+    status,
+    buttons: [...buttonRow.querySelectorAll(`[${BUTTON_ATTR}]`)],
+  };
 }
 
 function hideItem(item) {
@@ -154,27 +249,42 @@ function showItem(item) {
   item.style.removeProperty('display');
 }
 
-export function readToggleState(view = window) {
+export function readFilterMode(view = window) {
   try {
-    const stored = view.localStorage.getItem(TOGGLE_STORAGE_KEY);
-    return stored === null ? true : stored === 'true';
+    const stored = view.localStorage.getItem(FILTER_MODE_STORAGE_KEY);
+    return stored === null ? FILTER_MODES.qobuz : normalizeFilterMode(stored);
   } catch {
-    return true;
+    return FILTER_MODES.qobuz;
   }
 }
 
-export function writeToggleState(enabled, view = window) {
+export function writeFilterMode(mode, view = window) {
   try {
-    view.localStorage.setItem(TOGGLE_STORAGE_KEY, String(enabled));
+    view.localStorage.setItem(FILTER_MODE_STORAGE_KEY, normalizeFilterMode(mode));
   } catch {
-    // Ignore storage failures; the toggle still works for the current page view.
+    // Ignore storage failures; the controls still work for the current page view.
   }
 }
 
-export function applyQobuzFilter(doc = document, enabled = true) {
+function updateControls(doc, summary, mode) {
+  const { controls, status, buttons } = ensureControls(doc);
+  status.textContent = formatStatusText(summary, mode);
+  controls.hidden = summary.total === 0;
+
+  for (const button of buttons) {
+    const isActive = button.dataset.mode === mode;
+    button.setAttribute('aria-pressed', String(isActive));
+  }
+
+  return controls;
+}
+
+export function applyProviderFilter(doc = document, mode = FILTER_MODES.qobuz) {
+  const normalizedMode = normalizeFilterMode(mode);
   const items = getChartItems(doc);
+
   for (const item of items) {
-    if (!enabled || itemHasSupportedLink(item)) {
+    if (itemMatchesMode(item, normalizedMode)) {
       showItem(item);
       continue;
     }
@@ -183,10 +293,7 @@ export function applyQobuzFilter(doc = document, enabled = true) {
   }
 
   const summary = summarizeItems(items);
-  const status = ensureStatusElement(doc);
-  status.dataset.enabled = String(enabled);
-  status.textContent = formatStatusText(summary, enabled);
-  status.hidden = summary.total === 0;
+  updateControls(doc, summary, normalizedMode);
   return summary;
 }
 
@@ -219,20 +326,13 @@ function mutationTouchesChart(mutation) {
   });
 }
 
-function updateStatus(doc, summary, enabled) {
-  const status = ensureStatusElement(doc);
-  status.dataset.enabled = String(enabled);
-  status.textContent = formatStatusText(summary, enabled);
-  status.hidden = summary.total === 0;
-  return status;
-}
-
-export async function scanChartItemsForQobuz({
+export async function scanChartItemsForProviders({
   doc = document,
   view = window,
   shouldCancel = () => false,
   settleMs = SCAN_SETTLE_MS,
   maxSteps = SCAN_MAX_STEPS,
+  mode = FILTER_MODES.qobuz,
 } = {}) {
   const scrollingElement = doc.scrollingElement ?? doc.documentElement ?? doc.body;
   const startX = view.scrollX ?? 0;
@@ -242,7 +342,8 @@ export async function scanChartItemsForQobuz({
   let targetY = 0;
   let stableSteps = 0;
   let lastTotal = -1;
-  let lastMatches = -1;
+  let lastQobuzMatches = -1;
+  let lastTidalMatches = -1;
   let lastMaxScrollTop = -1;
 
   showAllItems(doc);
@@ -258,11 +359,13 @@ export async function scanChartItemsForQobuz({
         ...summarizeItems(items),
         scanning: true,
       };
+      updateControls(doc, summary, mode);
 
       const maxScrollTop = Math.max(0, (scrollingElement.scrollHeight || 0) - (view.innerHeight || 0));
       if (
         summary.total === lastTotal &&
-        summary.matches === lastMatches &&
+        summary.qobuzMatches === lastQobuzMatches &&
+        summary.tidalMatches === lastTidalMatches &&
         maxScrollTop === lastMaxScrollTop &&
         targetY >= maxScrollTop
       ) {
@@ -279,7 +382,8 @@ export async function scanChartItemsForQobuz({
       }
 
       lastTotal = summary.total;
-      lastMatches = summary.matches;
+      lastQobuzMatches = summary.qobuzMatches;
+      lastTidalMatches = summary.tidalMatches;
       lastMaxScrollTop = maxScrollTop;
 
       targetY = Math.min(maxScrollTop, targetY + stepSize);
@@ -297,7 +401,7 @@ export async function scanChartItemsForQobuz({
   };
 }
 
-export function initQobuzChartFilter({
+export function initChartProviderFilter({
   doc = document,
   locationObject = window.location,
 } = {}) {
@@ -309,7 +413,7 @@ export function initQobuzChartFilter({
   const view = doc.defaultView ?? window;
   const MutationObserverImpl = view.MutationObserver ?? MutationObserver;
   let pagePath = locationObject?.pathname ?? view.location?.pathname ?? '';
-  let enabled = readToggleState(view);
+  let mode = readFilterMode(view);
   let runId = 0;
   let scanPromise = null;
   let pendingRefresh = false;
@@ -333,26 +437,30 @@ export function initQobuzChartFilter({
 
     const activeRun = ++runId;
     const currentPromise = (async () => {
-      if (!enabled) {
-        applyQobuzFilter(doc, false);
+      if (mode === FILTER_MODES.off) {
+        applyProviderFilter(doc, FILTER_MODES.off);
         return;
       }
 
       if (hasScannedPage && !chartDirty) {
-        applyQobuzFilter(doc, true);
+        applyProviderFilter(doc, mode);
         return;
       }
 
-      const initialSummary = {
-        ...summarizeItems(getChartItems(doc)),
-        scanning: true,
-      };
-      updateStatus(doc, initialSummary, true);
+      updateControls(
+        doc,
+        {
+          ...summarizeItems(getChartItems(doc)),
+          scanning: true,
+        },
+        mode,
+      );
 
-      await scanChartItemsForQobuz({
+      await scanChartItemsForProviders({
         doc,
         view,
-        shouldCancel: () => activeRun !== runId || !enabled,
+        mode,
+        shouldCancel: () => activeRun !== runId || mode === FILTER_MODES.off,
       });
 
       if (activeRun !== runId) {
@@ -361,7 +469,7 @@ export function initQobuzChartFilter({
 
       hasScannedPage = true;
       chartDirty = false;
-      applyQobuzFilter(doc, enabled);
+      applyProviderFilter(doc, mode);
     })().finally(() => {
       if (scanPromise === currentPromise) {
         scanPromise = null;
@@ -372,21 +480,34 @@ export function initQobuzChartFilter({
         refresh('pending');
       }
     });
+
     scanPromise = currentPromise;
   };
 
-  const status = ensureStatusElement(doc);
-  if (!status.dataset.boundClick) {
-    status.dataset.boundClick = 'true';
-    status.addEventListener('click', () => {
-      enabled = !enabled;
-      writeToggleState(enabled, view);
+  const { buttons } = ensureControls(doc);
+  for (const button of buttons) {
+    if (button.dataset.boundClick) {
+      continue;
+    }
+
+    button.dataset.boundClick = 'true';
+    button.addEventListener('click', () => {
+      const nextMode = button.dataset.mode ?? FILTER_MODES.qobuz;
+      mode = mode === nextMode ? FILTER_MODES.off : normalizeFilterMode(nextMode);
+      writeFilterMode(mode, view);
       runId += 1;
       showAllItems(doc);
-      if (!enabled) {
-        applyQobuzFilter(doc, false);
+
+      if (mode === FILTER_MODES.off) {
+        applyProviderFilter(doc, FILTER_MODES.off);
         return;
       }
+
+      if (hasScannedPage && !chartDirty) {
+        applyProviderFilter(doc, mode);
+        return;
+      }
+
       refresh('toggle');
     });
   }
