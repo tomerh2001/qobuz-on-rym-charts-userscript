@@ -31,6 +31,8 @@ The script is intentionally narrow:
   counts settle.
 - Once a page has already been scanned, switching between Qobuz, Tidal, and
   off reuses the current page state instead of rescanning immediately.
+- Unrelated UI updates inside a chart card, such as another userscript
+  revealing RED/OPS badges, should not trigger a fresh provider scan.
 - Entries without a link for the active provider are hidden from the page.
 - A floating control panel in the bottom-left corner shows the current counts.
 - The floating controls render inside an isolated iframe so other page scripts do
@@ -58,9 +60,10 @@ The built userscript is written to `dist/qobuz-on-rym-charts.user.js`.
 - `v1.2.1` also removes the legacy single-button control if it is still present
   in the page DOM from an earlier build.
 - The current build should show two buttons: `Qobuz` and `Tidal`.
+- Clicking `Show RED / OPS` from `redacted-on-rym-userscript` should not start a
+  new Qobuz/Tidal scan on a page that was already settled.
 - In Violentmonkey, remove the older installed script if needed and reinstall
   from the latest release asset.
-- The current release version is `v1.2.1`.
 
 ## Local Fixture
 

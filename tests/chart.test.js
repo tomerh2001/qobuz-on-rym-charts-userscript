@@ -337,6 +337,58 @@ test('initChartProviderFilter stops provider-button clicks from leaking to other
   }
 });
 
+test('initChartProviderFilter ignores unrelated badge mutations inside an existing chart item', async () => {
+  const dom = await loadFixture();
+  const doc = dom.window.document;
+
+  Object.defineProperty(doc.documentElement, 'scrollHeight', {
+    configurable: true,
+    value: 2600,
+  });
+  Object.defineProperty(dom.window, 'innerHeight', {
+    configurable: true,
+    value: 900,
+  });
+
+  const scrollTargets = [];
+  dom.window.scrollTo = (_x, y) => {
+    scrollTargets.push(y);
+  };
+
+  globalThis.window = dom.window;
+  globalThis.document = doc;
+  globalThis.MutationObserver = dom.window.MutationObserver;
+
+  try {
+    const observer = initChartProviderFilter({
+      doc,
+      locationObject: dom.window.location,
+    });
+
+    await waitFor(() => !getStatusElement(doc).textContent.includes('Scanning'));
+
+    scrollTargets.length = 0;
+
+    const visibleItem = doc.getElementById('qobuz-entry');
+    const badge = doc.createElement('button');
+    badge.type = 'button';
+    badge.textContent = 'Show RED / OPS';
+    visibleItem.querySelector('.page_charts_section_charts_item_title')?.append(badge);
+
+    await new Promise(resolve => setTimeout(resolve, 150));
+
+    assert.deepEqual(scrollTargets, []);
+    assert.equal(doc.getElementById('qobuz-entry').style.display, '');
+    assert.equal(doc.getElementById('spotify-only-entry').style.display, 'none');
+
+    observer.disconnect();
+  } finally {
+    delete globalThis.window;
+    delete globalThis.document;
+    delete globalThis.MutationObserver;
+  }
+});
+
 test('initChartProviderFilter does not rescan after switching providers once the page was already scanned', async () => {
   const dom = await loadFixture();
   const doc = dom.window.document;

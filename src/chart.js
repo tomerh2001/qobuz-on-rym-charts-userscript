@@ -25,6 +25,7 @@ const PROVIDER_LINK_SELECTORS = {
   qobuz: 'a[href*="qobuz.com"]',
   tidal: 'a[href*="tidal.com"]',
 };
+const PROVIDER_LINK_SELECTOR = Object.values(PROVIDER_LINK_SELECTORS).join(', ');
 
 function normalizeWhitespace(value) {
   return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim() : '';
@@ -362,24 +363,13 @@ function showAllItems(doc = document) {
 }
 
 function mutationTouchesChart(mutation) {
-  const ElementImpl = mutation.target?.ownerDocument?.defaultView?.Element;
-  const target = mutation.target;
-  if (ElementImpl && target instanceof ElementImpl && target.closest(CHART_CONTAINER_SELECTOR)) {
-    return true;
-  }
-
   const nodes = [...mutation.addedNodes, ...mutation.removedNodes];
   return nodes.some(node => {
-    if (!ElementImpl || !(node instanceof ElementImpl)) {
-      return false;
-    }
-
     return Boolean(
-      node.closest(CHART_CONTAINER_SELECTOR) ||
-      node.matches(CHART_CONTAINER_SELECTOR) ||
-      node.matches(CHART_ITEM_SELECTOR) ||
-      node.querySelector(CHART_CONTAINER_SELECTOR) ||
-      node.querySelector(CHART_ITEM_SELECTOR),
+      (typeof node.matches === 'function' && node.matches(CHART_ITEM_SELECTOR)) ||
+      (typeof node.querySelector === 'function' && node.querySelector(CHART_ITEM_SELECTOR)) ||
+      (typeof node.matches === 'function' && node.matches(PROVIDER_LINK_SELECTOR)) ||
+      (typeof node.querySelector === 'function' && node.querySelector(PROVIDER_LINK_SELECTOR)),
     );
   });
 }
