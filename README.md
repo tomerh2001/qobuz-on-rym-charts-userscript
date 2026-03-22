@@ -49,6 +49,15 @@ npm run build
 
 The built userscript is written to `dist/qobuz-on-rym-charts.user.js`.
 
+## Troubleshooting
+
+- If you still see the old single-button `Qobuz only` UI, you are still running
+  an older userscript build.
+- The current build should show two buttons: `Qobuz` and `Tidal`.
+- In Violentmonkey, remove the older installed script if needed and reinstall
+  from the latest release asset.
+- The current release version is `v1.2.0`.
+
 ## Local Fixture
 
 RYM blocks one-off automated access from this environment, so the repo includes
