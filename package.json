@@ -1,6 +1,6 @@
 {
   "name": "qobuz-on-rym-charts-userscript",
-  "version": "1.2.4",
+  "version": "1.2.5",
   "description": "Violentmonkey userscript that hides Rate Your Music chart results without Qobuz or Tidal links.",
   "author": "Tomer Horowitz",
   "private": true,
