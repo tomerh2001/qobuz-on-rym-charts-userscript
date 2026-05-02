@@ -32,5 +32,5 @@
     "url": "https://github.com/tomerh2001/qobuz-on-rym-charts-userscript/issues"
   },
   "homepage": "https://github.com/tomerh2001/qobuz-on-rym-charts-userscript#readme",
-  "packageManager": "npm@9.2.0"
+  "packageManager": "npm@11.13.0"
 }
